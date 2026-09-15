@@ -1,0 +1,660 @@
+<!-- LATTICE -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --blue:#1418C8;
+    --blue-dk:#0C0EA0;
+    --chrome:#C6C6C6;
+    --hi:#FFFFFF;
+    --lo:#7A7A7A;
+    --dk:#000000;
+    --bone:#EDEAD8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    position:relative;
+    background:var(--blue);
+    color:#000;
+    font:14px/1.5 Helvetica,Arial,"Helvetica Neue",sans-serif;
+    -webkit-font-smoothing:none;
+    overflow-x:hidden;
+  }
+  /* halftone ground + faint plate grid, as on the card */
+  #ground{
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+      radial-gradient(rgba(255,255,255,.16) 34%, transparent 36%);
+    background-size:74px 74px, 74px 74px, 6px 6px;
+  }
+
+  .col{position:relative;z-index:2;max-width:660px;margin:0 auto;padding:52px 16px 90px}
+
+  /* ---- masthead ---- */
+  .mast h1{
+    margin:0;color:#fff;
+    font:bold 68px/.9 Helvetica,Arial,sans-serif;
+    letter-spacing:-.02em;
+  }
+  .ask{
+    display:inline-block;margin:22px 0 0;
+    background:var(--chrome);
+    border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi);
+    box-shadow:3px 3px 0 rgba(0,0,0,.35);
+    padding:14px 18px;
+    font:bold 21px/1.28 Helvetica,Arial,sans-serif;
+    max-width:26ch;
+  }
+  .sub{margin:16px 0 0;color:#fff;font-size:13px;opacity:.85;max-width:34ch}
+
+  /* ---- a note ---- */
+  .note{position:relative;margin:58px 0 0}
+  .frame{
+    background:var(--chrome);
+    border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi);
+    box-shadow:4px 4px 0 rgba(0,0,0,.35);
+    padding:9px;
+  }
+  .plate{
+    background:var(--bone);color:#111;
+    border:2px solid;border-color:var(--lo) var(--hi) var(--hi) var(--lo);
+    padding:18px 19px 20px;
+    font:16px/1.62 Helvetica,Arial,sans-serif;
+    text-wrap:pretty;
+  }
+  .rail{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;
+        margin-top:9px;flex-wrap:wrap}
+  .left{display:flex;align-items:center;gap:5px;min-height:26px}
+  .left i{height:30px;display:block;background:#000;padding:3px 4px;
+          border:1px solid var(--lo)}
+  .left i img{height:24px;width:auto;display:block;image-rendering:pixelated}
+  .give{display:flex;gap:3px;opacity:0;transition:opacity .4s}
+  .note.awake .give{opacity:1}
+  .give{align-items:center;gap:5px}
+  .give .lab{font:bold 11px Helvetica,Arial,sans-serif;color:#fff;
+             letter-spacing:.06em;text-transform:uppercase;opacity:.9;
+             margin-right:2px;white-space:nowrap}
+  .give button img{height:22px;width:auto;display:block;image-rendering:pixelated;
+                   background:#000;padding:3px 4px}
+  .give button{
+    display:flex;align-items:center;gap:6px;
+    padding:5px 9px 5px 5px;cursor:pointer;line-height:1;
+    font:bold 11px Helvetica,Arial,sans-serif;color:#111;
+    background:var(--chrome);
+    border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi);
+    box-shadow:2px 2px 0 rgba(0,0,0,.3);
+  }
+  .give button:hover{background:#D6D6D6}
+  .give button:active{border-color:var(--dk) var(--hi) var(--hi) var(--dk);
+                      box-shadow:none;transform:translate(2px,2px)}
+  .give button:focus-visible{outline:1px dotted #000;outline-offset:-5px}
+  .tag{font:bold 12px Helvetica,Arial,sans-serif;color:#333}
+
+  /* growth layer, layered over the whole message column. #vinefield holds
+     ONLY decorative decals — never real note content — so it's safe to mask
+     as a whole: brushing hides growth, never a message's actual text.
+     CONTRACT for vine-interaction.js: any future redesign of the growth
+     art only needs to render its decals as children of #vinefield. The
+     mask (--mx/--my/--mr) and the scroll-sway transform both live on this
+     one element, so nothing else needs to change to swap the art out. */
+  #messages{position:relative}
+  #vinefield{
+    position:absolute;top:0;left:0;right:0;z-index:5;pointer-events:none;
+    overflow:visible;
+    --mx:-999px; --my:-999px; --mr:0px;
+    -webkit-mask-image: radial-gradient(circle var(--mr) at var(--mx) var(--my),
+      rgba(255,255,255,0) 0%, rgba(255,255,255,0) 58%, rgba(255,255,255,1) 100%);
+    mask-image: radial-gradient(circle var(--mr) at var(--mx) var(--my),
+      rgba(255,255,255,0) 0%, rgba(255,255,255,0) 58%, rgba(255,255,255,1) 100%);
+  }
+  .vine-decal{position:absolute;display:block;image-rendering:pixelated;
+              filter:drop-shadow(1px 1px 0 rgba(0,0,0,.4));}
+
+  /* ---- feather ---- */
+  #plume{position:fixed;inset:0;z-index:30;pointer-events:none}
+  #feather{position:fixed;top:0;left:0;z-index:31;width:64px;height:64px;
+           background:none;border:none;padding:0;cursor:pointer;display:none;
+           pointer-events:none}
+  #feather.live{display:block}
+  #feather svg{width:100%;height:100%}
+
+  /* the prompt the feather leaves behind when it lands */
+  #quill{
+    position:fixed;z-index:32;display:none;align-items:center;gap:10px;
+    background:var(--chrome);cursor:pointer;
+    border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi);
+    box-shadow:4px 4px 0 rgba(0,0,0,.4);
+    padding:9px 14px 9px 10px;
+    font:bold 14px Helvetica,Arial,sans-serif;color:#111;
+    opacity:0;transform:translateY(6px);transition:opacity .5s ease, transform .5s ease;
+  }
+  #quill.live{display:flex}
+  #quill.in{opacity:1;transform:translateY(0)}
+  #quill:hover{background:#D6D6D6}
+  #quill:active{border-color:var(--dk) var(--hi) var(--hi) var(--dk);
+                box-shadow:none;transform:translate(3px,3px)}
+  #quill svg{width:30px;height:30px;flex:none}
+  #quill em{font-style:normal;display:block;font-weight:normal;font-size:11px;opacity:.7}
+  @media (max-width:560px){ #quill{font-size:13px;padding:8px 11px 8px 8px} }
+
+  /* ---- compose ---- */
+  .veil{position:fixed;inset:0;background:rgba(8,10,120,.86);display:none;
+        place-items:center;padding:16px;z-index:60}
+  .veil.on{display:grid}
+  .box{width:100%;max-width:460px;background:var(--chrome);
+       border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi);
+       box-shadow:5px 5px 0 rgba(0,0,0,.4)}
+  .box .head{background:var(--blue-dk);color:#fff;font:bold 13px Helvetica,Arial,sans-serif;
+             padding:5px 8px;display:flex;justify-content:space-between}
+  .box .head b{cursor:pointer;background:var(--chrome);color:#000;
+               border:1px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi);
+               width:18px;text-align:center}
+  .box .in{padding:14px}
+  .box .q{font:bold 15px/1.3 Helvetica,Arial,sans-serif;margin:0 0 10px}
+  textarea{width:100%;min-height:120px;resize:none;background:var(--bone);color:#111;
+           font:15px/1.55 Helvetica,Arial,sans-serif;padding:11px;
+           border:2px solid;border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+  textarea:focus{outline:1px dotted #000;outline-offset:-5px}
+  textarea::placeholder{color:#8A8A8A}
+  .foot{margin-top:11px;display:flex;justify-content:space-between;align-items:center}
+  .rem{font:12px "Courier New",monospace}
+  .rem.over{color:#B00000;font-weight:bold}
+  .btn{min-width:86px;padding:5px 12px;cursor:pointer;
+       font:bold 13px Helvetica,Arial,sans-serif;background:var(--chrome);
+       border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi)}
+  .btn:active{border-color:var(--dk) var(--hi) var(--hi) var(--dk)}
+  .btn[disabled]{color:var(--lo);text-shadow:1px 1px 0 var(--hi);cursor:default}
+
+  /* ---- arrival ---- */
+  #arrive{position:fixed;inset:0;z-index:80;background:var(--blue);
+          display:grid;place-items:center;transition:opacity .9s ease}
+  #arrive .hand{display:flex;gap:26px;align-items:center}
+  #arrive .hand i{display:block;opacity:0;transform:translateY(14px) scale(1.25);
+                  transition:opacity .5s ease, transform .7s ease}
+  #arrive .hand i.in{opacity:1;transform:translateY(0) scale(1)}
+  #arrive .hand i{background:#000;padding:14px 16px;
+                  border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi)}
+  #arrive .hand i img{height:110px;width:auto;display:block;image-rendering:pixelated}
+  #arrive.gone{opacity:0;pointer-events:none}
+
+  /* ---- pocket ---- */
+  .pocket{position:fixed;left:0;right:0;bottom:0;z-index:26;
+          background:var(--chrome);border-top:2px solid var(--hi);
+          padding:5px 12px;display:flex;align-items:center;gap:10px}
+  .pocket .lab{font:bold 12px Helvetica,Arial,sans-serif}
+  .pocket .items-lab{font:bold 11px Helvetica,Arial,sans-serif;color:var(--lo);
+             text-transform:uppercase;letter-spacing:.05em;margin-left:auto}
+  .pocket .items{display:flex;gap:5px;align-items:center;
+                 border:2px solid;border-color:var(--lo) var(--hi) var(--hi) var(--lo);
+                 padding:4px 9px;min-height:32px}
+  .pocket i{display:block;background:#000;padding:3px 5px;border:1px solid var(--lo)}
+  .pocket i img{height:24px;width:auto;display:block;image-rendering:pixelated}
+  .pocket .none{font-size:11px;color:var(--lo)}
+  .pocket .gardener{font-size:11px;color:var(--lo);text-decoration:none;
+                     margin-left:10px;white-space:nowrap}
+  .pocket .gardener:hover{color:#333;text-decoration:underline}
+
+  @media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
+  @media (max-width:560px){
+    .mast h1{font-size:46px}
+    .ask{font-size:18px}
+    .plate{font-size:15px;padding:16px}
+    .col{padding:34px 12px 70px}
+  }
+</style>
+
+<div id="ground"></div>
+
+<!-- halftone-dithered item art, drawn as dot masses so it matches the card -->
+<script>
+const ART = {
+  acorn:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAF8AAACACAYAAABtJLUPAAAEx0lEQVR42u1d2Y7kIAyMEf//y9631aiVdOP7iHka7bAchXG5wGEAEa8i5e9A4WpQVkHg25Qq4MPNYuCA77sArRZhXVMG/DdywioA6qlrKbcAe6x7LJ9LvlB5gTr4fBjLH3fU2ue38//d4nwYy7cBc6KdxFYNA/7wQCvCRWJdGMuPs+YyJ507EbgUiy2tbKMt/846McGuaWH56ByJwMU/+YQuln/qb+Hg/yMBRFQYs/tOAWH2wi9LQme/fdI3fERGSDSQFG4HFd0BdZdouA8QuCyVhakosrDLGJagMygo8UERbPEC/PL5aOgikOCr737/y12A4y4BC/BPyYvji5HRFqdf/Pj5V5un/YrD6dXQRdztEIt+xdHacgACBf9WZaFZc1hMkTTRz3O/x+P56/NR6H/xwLp+CRtqm9kLUAkXlQDRBvA0eoHDeZwYFfWohCT+FhMErSu907ZAqS2LuXJCbTL4GLU9DcfnJQoxItRExTZQqV8k1kOr+VJ8/hTlHb4HbHOgP3ca/AVfqt6kstyrPe95PEVN/xdgWW2phO2lU8wn4OPh70PJK5kSPuoL8P5YE67hAvOdsajCoGvk4dQf3BFuhWxgzTOh0/tbKgmT8NsCS0FFENDRSiHLzqCAjwQLjCJLVG7LcgHwU+EOyTqWdUAQ2oRTPcannMSyzvO5l9mSi3aLehyF6za+JbS6rnk6LmNbQZNt8VKUpc/PANZJv8j8HfeYRCOrGZ58Pjf8O0mOAoX2NKMycGwLOHH+U/LR3VHpKWhwMHhqnM0lQ01RSVrMJdjSHqKpQmG75I5fI5YZ78psGYZHECekST3SQCoGHlnKp/UshJO1IaHE6DKFmtyUaziU+SpHApp4zdOOgTpmwA8k9m1gQR5fKaIBqO53AVvgg5FAnNr1vN1R+DViNb+NimCZZHOMzw8k4ZV5cN1J+JvImvtc452zhSoy6nrQ8rpRg1xHZGV3pwN+YMl+jVhSuWoQLmUiVh8WvJZwkQBwy7/sEKVwJVaePUGK0y9V4b4u2nnVW8paT7JY1EPHftUJV/puwWgFgc9/8osUEu5IrqoGuJ0GHpVVzAHL7a3NbCILguqVI9xO5BoSdUnzdqYIwNdSuFVB0n4HQo1wnwaneY4TXc8r28LN58PL2ksFPr6sPXWF+zRY6js3XcSXyRfyGtGO9qf+UQBygBa9qS8VWXDYORAGqZ1VDIR+KfMoI7KyK+GShJvtHeOI8bFz+rXucN+qZEUvkyyDrd4N4G/fF4sw2YzBWChNDOr3Wz3JHa65zwfFHQLO1jwKN4hPtMhavIiaby+8kQ9EZSuA3ukNTup1qDv431RhxLGwBVmX9fkeE4NI0CLBzzBZLGYsQ7jZFmQLB4PFwQzlgG0wgQoJUpDBgNYLt3srhWs9mVff4XImVeGu1zQnxxt8LVFksSDcu9lS4D+BW+kj6CHcN5QKGWttBZ6F26kKkLvb2Q6TqfoGfmnwvS0Sqli8J+HOW/kJox1r5Zp+0S0JNzMJp1iYHTRpjSMHLrm2Th3RWiDoavHR4D+l4b2KnFcSK39llJXB7XDfMvj2HkSJHeQd7XCiIc4fPihRsinc0wsOvBrwQ4Uj5TaWXgV8uF7wsNJcpgz4IYIrvPwDPyTN9m6m5UAAAAAASUVORK5CYII=",
+  leaf:"data:image/png;base64,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",
+  wing:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAAAxCAYAAAASqKEbAAADYUlEQVR42u1c247rMAj0VPn/X+Y8HFWqsr4ABoydWNqHTdvgmGG4GAdEVBzG96aoXCs/n9Ht/97vv9c5197BHJehsluf1ZQD5n1IKO8dQQCggTILU+kQAqf1PRLO5R3fBWO4AImyZym65Tq496SKaynldRsqAERblZc8EjDP6wKMLIQ6wV7tOhyVAiYw8ESGuITKb9FxbRHBWFwsDOrusokJ6qOAcXcBHORrAkCO1WUYpGCS47OAu8IhSMdav639nhgW2wMRMb/HDSxJCN4t3cYvA1gES1Y06b2YI2VbxRnbMIB2wXsWnhr4QgWO2IR2BcOng/7e9Xv0DgVgRlRLFZlR1cKewmuu5PevNlcqSSuYoP8+QKJAzzyda4mrrEwqPz0zSCqBWKT0bEDQyk6ZAY0A4Kl8GAOpRdHcLCDqGXpZDFYAgBqFkaxKl/p7bbFJs++xgg3N6gBk/NDUqB14POQoJ5+la2nfgkU6GlKavtcBsKm1r4wFPOW7y9CUgqMVX9tYyrRxEw0EUzk1AHAFWLdnWewx7JIeppHVygJGQixLvpYZwerUarseis/Ap7aqcVhk6dxof+UWc6T86fI7hF3BFvkvDrLAbIwkfn4o28Jn+/xW1AKe4BLEMj+TgkZ75hYLQB3ZtfvXNqhqmzPeIORuZlnPCR39mDHAqtw86x4Cp0klsjmVnTbC4WSQtdXDeX69TiJOUGfV/GIFENFcLwf0aWrvLSovAfODYP6eZWwYKFVszXA6G5g1Wj75BBEpQDcVBGoDxdIJ4LzkjxpGT1A0BOtJkQywqhFCer7hkSwQ7QK8Fv7JZ/1mFIjrkIc//fAn56idJgimFUFgFuVkBonGbZICBEsYQHqen3tk/BQK12zwSHJ/WhkDSFMy7+4iLFCwZUA8XTxaGQNgYOERGUPEOQcEsYZqZAgC4WQdHMVQkVXZZppmrd6e8sePTy1+gkqgp3VaHmXv+VNvtnJjxMwAiHQFXj53JoANAden5B7SdxFQwHx6B0VngNQqW7uCPzsDcN3Cqs4bODBLKNudUgnM6CYkbyDBKjDvxgBZcnuNrJRHxa9y3qCSM2hMWbk8DQBgBFsWCqEB9RNjTlu8H+D0oWGLo14ld5V3SPYkOEreaqPq83Dlc84Q9HLy7d9D/A8W94cWVG+LJgAAAABJRU5ErkJggg=="
+};
+</script>
+
+<div class="col">
+  <div class="mast">
+    <h1>LATTICE</h1>
+    <div class="ask">A moment you felt like you belonged.</div>
+    <p class="sub">Others answered first. Read a few.</p>
+  </div>
+  <div id="messages"></div>
+</div>
+
+<canvas id="plume"></canvas>
+<div id="quill" role="button" tabindex="0">
+  <svg viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M54 8C34 13 18 28 13 48l-5 9" stroke="#333" stroke-width="2.4" fill="none"/>
+    <path d="M52 10C38 14 24 25 18 39c-3 7-4 11-5 14 4-1 9-3 15-7C46 37 51 24 52 10z" fill="#FAFAF2" stroke="#333" stroke-width="1.6"/>
+  </svg>
+  <span>Click here to write<em>your answer joins the wall</em></span>
+</div>
+
+<button id="feather" aria-hidden="true" tabindex="-1">
+  <svg viewBox="0 0 64 64">
+    <path d="M54 8C34 13 18 28 13 48l-5 9" stroke="#fff" stroke-width="2" fill="none" opacity=".7"/>
+    <path d="M52 10C38 14 24 25 18 39c-3 7-4 11-5 14 4-1 9-3 15-7C46 37 51 24 52 10z" fill="#EDEAD8"/>
+  </svg>
+</button>
+
+<div class="veil" id="veil">
+  <div class="box">
+    <div class="head"><span>answer</span><b id="x">×</b></div>
+    <div class="in">
+      <p class="q">A moment you felt like you belonged.</p>
+      <textarea id="text" maxlength="240" placeholder="whisper to the wall" aria-label="Your answer"></textarea>
+      <div class="foot">
+        <span class="rem" id="count">200</span>
+        <div><button class="btn" id="away">Cancel</button>
+             <button class="btn" id="leave" disabled>Leave it</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="pocket">
+  <span class="lab">LATTICE</span>
+  <a class="gardener" href="contact.html">contact</a>
+  <span class="items-lab">pocket</span>
+  <div class="items" id="pocket"></div>
+</div>
+
+<div id="arrive"><div class="hand" id="hand"></div></div>
+
+<script>
+const LIMIT=200, rnd=(a,b)=>a+Math.random()*(b-a);
+const ico = k => ART[k] ? `<img src="${ART[k]}" alt="${k}">` : '';
+
+let messages=[
+  {t:"The night my roommates and I ate cold pizza on the kitchen floor because the table wasn't built yet.", left:['leaf','acorn','leaf','acorn','leaf','acorn','leaf'], mine:false},
+  {t:"A stranger at the laundromat held the door with her foot and said take your time, honey.", left:['acorn','leaf'], mine:false},
+  {t:"Standing in the back at a show where I knew nobody and everyone knew the words.", left:['acorn','acorn','wing','leaf'], mine:false},
+  {t:"Sunday dinners at my grandmother's. Twelve years ago now. I can still hear the chairs scraping.", left:['leaf','acorn','leaf','acorn','wing','leaf','acorn','leaf','acorn','leaf','acorn','leaf','wing','acorn'], mine:false},
+  {t:"When the barista started making my order before I said it.", left:['leaf'], mine:false},
+  {t:"Honestly, not for a long time. But I liked reading these.", left:['acorn','acorn','leaf'], mine:false},
+  {t:"On a bus at 2am with six people I'd met that week, all of us asleep except the driver.", left:[], mine:false}
+];
+
+/* ---- pocket: persists per device via localStorage, refills on a timer ----
+   Design choice worth knowing about: if the pocket is already full when a
+   27-hour period completes, that refill is "owed" rather than dropped —
+   it doesn't advance the clock, so the moment a slot opens up (an item is
+   given away), the owed item appears right away instead of making the
+   person wait out a fresh 27 hours on top of the wait they already did. */
+const POCKET_KEY = 'lattice_pocket_v1';
+const REFILL_MS = 27 * 60 * 60 * 1000;
+const POCKET_CAP = 4;
+
+function randomItem(){
+  const r = Math.random();
+  if (r < 0.20) return 'wing';       // 20% wing
+  return r < 0.60 ? 'leaf' : 'acorn'; // 40% leaf, 40% acorn
+}
+function loadPocketState(){
+  try { const raw = localStorage.getItem(POCKET_KEY); if (raw) return JSON.parse(raw); }
+  catch(e){}
+  return null;
+}
+function savePocketState(state){
+  try { localStorage.setItem(POCKET_KEY, JSON.stringify(state)); } catch(e){}
+}
+// each completed 27-hour period is consumed on schedule, whether or not
+// there was room for it — a full pocket wastes the refill rather than
+// banking it for later, so nothing is owed once a slot next opens up
+function applyOwedRefills(state){
+  const now = Date.now();
+  let changed = false;
+  while ((now - state.lastRefill) >= REFILL_MS){
+    if (state.items.length < POCKET_CAP){
+      state.items.push(randomItem());
+      changed = true;
+    }
+    state.lastRefill += REFILL_MS;   // period used up either way
+  }
+  return changed;
+}
+
+let isFirstVisit = false;
+let pocketState = loadPocketState();
+if (!pocketState){
+  isFirstVisit = true;
+  const starting = ['acorn','leaf','acorn'];
+  if (Math.random() < 0.22) starting.push('wing');
+  pocketState = { items: starting, lastRefill: Date.now() };
+}
+applyOwedRefills(pocketState);
+savePocketState(pocketState);
+let pocket = pocketState.items;
+
+// in case a tab is left open across a 27-hour boundary, without needing a reload
+setInterval(() => {
+  if (applyOwedRefills(pocketState)){ savePocketState(pocketState); drawPocket(); }
+}, 5*60*1000);
+
+const wrap=document.getElementById('messages');
+
+/* one continuous plant, rooted below the oldest message, climbing the
+   whole column. depth 0 = top (newest), depth 1 = bottom (oldest).
+   strength is a pure function of pixel position, not of which note
+   you're "in" — so nothing resets or restarts between messages. */
+/* one continuous plant, rooted below the oldest message, climbing the
+   whole column. depth 0 = top (newest), depth 1 = bottom (oldest).
+   strength is a pure function of pixel position, not of which note
+   you're "in" — so nothing resets or restarts between messages. */
+function strengthAt(depthFrac){
+  let st = Math.max(0, (depthFrac - 0.38) / 0.62);
+  return Math.pow(st, 0.72);
+}
+
+/* ============================================================
+   GROWTH ART — placeholder pass.
+   This whole block is the ONE thing meant to be thrown away and
+   redrawn. It knows about strength/stages and corner geometry;
+   it does NOT know anything about masking, brushing, or sway —
+   that's all handled by whatever fills #vinefield (see the
+   VINE INTERACTION section below), so redesigning this part
+   never touches that part.
+
+   >>> SWAP POINT: replace CORNER_ART below with real Photoshop
+   assets once they exist. Each stage can point at a different
+   image (or several, picked at random) instead of reusing the
+   card's leaf icon. Sizes/rotations are guidance, not gospel —
+   tune them once real art is in.
+   ============================================================ */
+const CORNER_ART = {
+  // stage 0 = nothing. stages 1-3 = light / full / heavy overgrowth.
+  // each stage lists which corners get a decal, and how many/how big.
+  1: { corners: ['tl','tr'],           count: [1,1], size: [26, 34], rot: 18 },
+  2: { corners: ['tl','tr','bl','br'], count: [1,2], size: [30, 42], rot: 26 },
+  3: { corners: ['tl','tr','bl','br'], count: [2,3], size: [34, 50], rot: 34 },
+};
+const STAGE_THRESHOLDS = [0.38, 0.55, 0.78]; // strength boundaries -> stage 0/1/2/3
+
+function stageFor(strength){
+  if (strength < STAGE_THRESHOLDS[0]) return 0;
+  if (strength < STAGE_THRESHOLDS[1]) return 1;
+  if (strength < STAGE_THRESHOLDS[2]) return 2;
+  return 3;
+}
+
+// deterministic per-note "random" so a note's growth doesn't reshuffle
+// on every re-render (new messages arriving shouldn't visibly disturb
+// growth already attached to older ones)
+function noteRng(seedNum){
+  let s = Math.abs(seedNum*9301 + 49297) % 233280;
+  return () => (s = (s*9301 + 49297) % 233280) / 233280;
+}
+
+// builds the decal elements for one note's corner, given its stage.
+// CORNER_X/Y below are where, in field-local px, that corner sits.
+function decalsForCorner(corner, stage, cx, cy, rng){
+  const spec = CORNER_ART[stage];
+  if (!spec || !spec.corners.includes(corner)) return [];
+  const n = spec.count[0] + Math.round(rng() * (spec.count[1]-spec.count[0]));
+  const out = [];
+  for (let i = 0; i < n; i++){
+    const size = spec.size[0] + rng() * (spec.size[1]-spec.size[0]);
+    const rot  = (rng()-0.5) * 2 * spec.rot;
+    const jx = (rng()-0.5) * size * 0.5;
+    const jy = (rng()-0.5) * size * 0.5;
+    // pull the decal slightly toward the frame's corner so it reads as
+    // "gripping" the edge rather than floating near it
+    const pullX = corner.includes('l') ? size*0.22 : -size*0.22;
+    const pullY = corner.includes('t') ? size*0.22 : -size*0.22;
+    out.push({ x: cx + jx + pullX, y: cy + jy + pullY, size, rot, corner });
+  }
+  return out;
+}
+
+/* rebuild the field to match the current (possibly just-changed) column
+   height and each note's real, measured geometry — called after every
+   render() and on resize */
+function renderVines(){
+  let field = document.getElementById('vinefield');
+  if (!field){
+    field = document.createElement('div');
+    field.id = 'vinefield';
+    field.setAttribute('aria-hidden','true');
+    wrap.prepend(field);
+  }
+  const totalHeight = Math.round(wrap.scrollHeight) + 60;
+  field.style.height = totalHeight + 'px';
+  field.innerHTML = '';
+
+  const fieldRect = field.getBoundingClientRect();
+  const notes = [...wrap.querySelectorAll('.note')];
+  const frag = document.createDocumentFragment();
+
+  notes.forEach((note, i) => {
+    const frame = note.querySelector('.frame');
+    if (!frame) return;
+    const r = frame.getBoundingClientRect();
+    const top    = r.top    - fieldRect.top;
+    const bottom = r.bottom - fieldRect.top;
+    const left   = r.left   - fieldRect.left;
+    const right  = r.right  - fieldRect.left;
+    const centerY = (top + bottom) / 2;
+    const strength = strengthAt(Math.max(0, Math.min(1, centerY / totalHeight)));
+    const stage = stageFor(strength);
+    if (stage === 0) return;
+
+    const rng = noteRng(4242 + i*97);
+    const corners = {
+      tl: [left, top], tr: [right, top],
+      bl: [left, bottom], br: [right, bottom],
+    };
+    Object.entries(corners).forEach(([name, [cx, cy]]) => {
+      decalsForCorner(name, stage, cx, cy, rng).forEach(d => {
+        const img = document.createElement('img');
+        img.className = 'vine-decal';
+        img.src = ART.leaf;              // <<< SWAP POINT: real corner art goes here
+        img.style.left = (d.x - d.size/2) + 'px';
+        img.style.top  = (d.y - d.size/2) + 'px';
+        img.style.width = d.size + 'px';
+        img.style.height = 'auto';
+        img.style.transform = `rotate(${d.rot.toFixed(1)}deg)`;
+        img.style.opacity = (0.75 + rng()*0.25).toFixed(2);
+        frag.appendChild(img);
+      });
+    });
+  });
+
+  field.appendChild(frag);
+}
+
+/* ============================================================
+   VINE INTERACTION — brushing the growth aside, and a scroll sway
+   that hints it's alive.
+
+   CONTRACT: this section only ever touches #vinefield as a whole —
+   it never reaches inside it. Whatever renderVines() (above) puts
+   inside that div — placeholder leaf icons today, hand-drawn corner
+   art later, something else entirely after that — gets brushed and
+   swayed automatically, with zero changes needed here.
+   ============================================================ */
+(function initVineInteraction(){
+  const BRUSH_R      = 92;     // how wide a clearing the cursor opens, in field px
+  const GROW_RATE     = 0.22;  // per-frame ease when the hole is opening (snappy)
+  const REGROW_RATE   = 0.018; // per-frame ease when it's closing (slow, "growing back")
+  const REGROW_DELAY  = 1300;  // ms of stillness before it starts growing back
+  const SWAY_MAX      = 13;    // px of lateral sway at the strongest scroll kick
+  const SWAY_DECAY    = 0.90;  // per-frame damping of the sway spring
+
+  let lastClientX = -9999, lastClientY = -9999;
+  let holeX = -999, holeY = -999, holeR = 0, holeTargetR = 0;
+  let regrowTimer = null;
+  let swayX = 0, lastScrollY = window.scrollY;
+
+  function updateHoleFromLast(){
+    const field = document.getElementById('vinefield');
+    if (!field) return;
+    const rect = field.getBoundingClientRect();
+    if (lastClientY < rect.top || lastClientY > rect.bottom ||
+        lastClientX < rect.left || lastClientX > rect.right){
+      return;                        // cursor isn't over the growth at all
+    }
+    holeX = lastClientX - rect.left;
+    holeY = lastClientY - rect.top;
+  }
+
+  function onPointerMove(e){
+    lastClientX = e.clientX; lastClientY = e.clientY;
+    updateHoleFromLast();
+    holeTargetR = BRUSH_R;
+    clearTimeout(regrowTimer);
+    regrowTimer = setTimeout(() => { holeTargetR = 0; }, REGROW_DELAY);
+  }
+
+  function onScroll(){
+    const y = window.scrollY;
+    const delta = y - lastScrollY;
+    lastScrollY = y;
+    swayX = Math.max(-SWAY_MAX, Math.min(SWAY_MAX, swayX + delta * 0.16));
+    updateHoleFromLast();           // content moved under a stationary cursor
+  }
+
+  function tick(){
+    const rate = holeTargetR > holeR ? GROW_RATE : REGROW_RATE;
+    holeR += (holeTargetR - holeR) * rate;
+    if (holeR < 0.4) holeR = 0;
+    const field = document.getElementById('vinefield');
+    if (field){
+      field.style.setProperty('--mx', holeX.toFixed(1) + 'px');
+      field.style.setProperty('--my', holeY.toFixed(1) + 'px');
+      field.style.setProperty('--mr', holeR.toFixed(1) + 'px');
+
+      swayX *= SWAY_DECAY;
+      if (Math.abs(swayX) < 0.05) swayX = 0;
+      field.style.transform = swayX ? `translateX(${swayX.toFixed(2)}px)` : '';
+    }
+    requestAnimationFrame(tick);
+  }
+
+  window.addEventListener('pointermove', onPointerMove, {passive:true});
+  window.addEventListener('scroll', onScroll, {passive:true});
+  requestAnimationFrame(tick);
+})();
+
+function render(){
+  wrap.innerHTML=messages.map((m,i)=>{
+    const shown=m.mine?'':m.left.map(k=>`<i>${ico(k)}</i>`).join('');
+    const give=m.mine?'':`<div class="give"><span class="lab">leave&nbsp;one&nbsp;&rsaquo;</span>${pocket.map((k,j)=>
+      `<button data-msg="${i}" data-slot="${j}" title="leave ${k}" aria-label="Leave ${k}">${ico(k)}<span>${k}</span></button>`).join('')}</div>`;
+    return `<div class="note">
+      <div class="frame">
+        <div class="plate">${m.t}</div>
+        <div class="rail"><div class="left">${shown}</div>${give}</div>
+      </div></div>`;
+  }).join('');
+  drawPocket(); observe(); requestAnimationFrame(renderVines);
+}
+
+function drawPocket(){
+  const el=document.getElementById('pocket');
+  el.innerHTML=pocket.length?pocket.map(k=>`<i title="${k}">${ico(k)}</i>`).join('')
+    :'<span class="none">Nothing left to give. Come back soon.</span>';
+}
+
+let io;
+function observe(){
+  if(io) io.disconnect();
+  io=new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting) setTimeout(()=>e.target.classList.add('awake'),700);
+  }),{threshold:.45});
+  document.querySelectorAll('.note').forEach(n=>io.observe(n));
+}
+
+wrap.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-slot]'); if(!b) return;
+  const mi=+b.dataset.msg, slot=+b.dataset.slot, tok=pocket[slot]; if(!tok) return;
+  pocket.splice(slot,1); messages[mi].left.push(tok);
+  applyOwedRefills(pocketState); savePocketState(pocketState);
+  render();
+});
+
+/* ---- arrival: shows the pocket's current contents every visit — what's
+   in it is useful information whether it's a first-time starting hand or
+   a returning device's earned-up stash, so this always plays. ---- */
+const hand=document.getElementById('hand'), arrive=document.getElementById('arrive');
+const arrivalMs = pocket.length ? 350 + pocket.length*420 : 0;
+if (pocket.length){
+  hand.innerHTML=pocket.map(k=>`<i>${ico(k)}</i>`).join('');
+  [...hand.children].forEach((el,i)=>setTimeout(()=>el.classList.add('in'), 350+i*420));
+  setTimeout(()=>arrive.classList.add('gone'), arrivalMs+1500);
+  setTimeout(()=>arrive.remove(), arrivalMs+2600);
+} else {
+  arrive.remove();   // nothing to show if the pocket is currently empty
+}
+
+/* ---- feather ---- */
+const cv=document.getElementById('plume'), ctx=cv.getContext('2d'), fEl=document.getElementById('feather');
+let trail=[], fx=0, fy=-70, t0=0, drift=false, rest=false, ph=rnd(0,6.28), raf=0;
+const size=()=>{cv.width=innerWidth;cv.height=innerHeight}; size();
+
+function launch(){
+  fy=-70; ph=rnd(0,6.28); drift=true; rest=false; trail=[];
+  fEl.classList.add('live'); t0=performance.now();
+  cancelAnimationFrame(raf); raf=requestAnimationFrame(step);
+}
+function step(now){
+  const t=(now-t0)/1000;
+  if(drift){
+    fy=-70+t*62;
+    const sway=Math.sin(t*1.02+ph)*84+Math.sin(t*2.25+ph)*18;
+    fx=Math.max(16,Math.min(innerWidth-88, innerWidth/2+sway+Math.sin(ph)*78));
+    fEl.style.transform=`translate(${fx}px,${fy}px) rotate(${(Math.sin(t*1.02+ph)*27).toFixed(1)}deg)`;
+    trail.push({x:fx+32,y:fy+34,a:1,s:rnd(2,4)});
+    if(fy>innerHeight-190){drift=false;rest=true;land()}
+  }
+  trail.forEach(p=>{p.a-=.011;p.y+=.13});
+  trail=trail.filter(p=>p.a>0);
+  ctx.clearRect(0,0,cv.width,cv.height);
+  trail.forEach(p=>{ // square, quantized — halftone-ish, not soft
+    ctx.fillStyle=`rgba(255,255,255,${(Math.round(p.a*4)/4)*.55})`;
+    const s=Math.round(p.s);
+    ctx.fillRect(Math.round(p.x/2)*2,Math.round(p.y/2)*2,s,s);
+  });
+  raf=(drift||trail.length)?requestAnimationFrame(step):0;
+}
+function land(){
+  const q = document.getElementById('quill');
+  const x = Math.max(12, Math.min(innerWidth - 250, fx - 8));
+  const y = Math.max(60, Math.min(innerHeight - 150, fy + 14));
+  q.style.left = x + 'px'; q.style.top = y + 'px';
+  q.classList.add('live');
+  fEl.classList.remove('live');
+  requestAnimationFrame(()=>q.classList.add('in'));
+}
+
+setTimeout(launch, 10000 + arrivalMs);
+addEventListener('resize', ()=>{ size(); if(rest) land(); clearTimeout(window.__g); window.__g=setTimeout(renderVines,180); });
+
+/* ---- compose ---- */
+const veil=document.getElementById('veil'), text=document.getElementById('text'),
+      count=document.getElementById('count'), leave=document.getElementById('leave');
+const quill=document.getElementById('quill');
+const openWrite=()=>{veil.classList.add('on');text.focus()};
+quill.addEventListener('click',openWrite);
+quill.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openWrite()}});
+document.getElementById('away').onclick=()=>veil.classList.remove('on');
+document.getElementById('x').onclick=()=>veil.classList.remove('on');
+text.addEventListener('input',()=>{
+  const r=LIMIT-text.value.length;
+  count.textContent=r; count.className='rem'+(r<0?' over':'');
+  leave.disabled=!text.value.trim()||r<0;
+});
+leave.onclick=()=>{
+  messages.unshift({t:text.value.trim(),left:[],mine:true});
+  text.value=''; count.textContent=LIMIT; leave.disabled=true;
+  veil.classList.remove('on'); fEl.classList.remove('live'); quill.classList.remove('live','in');
+  render(); scrollTo({top:0,behavior:'smooth'});
+};
+
+window.lattice={open(){['teacup','pinwheel'].forEach(k=>{if(!pocket.includes(k))pocket.push(k)});savePocketState(pocketState);render();return'teacup and pinwheel are in your pocket.'}};
+
+render();
+</script>
