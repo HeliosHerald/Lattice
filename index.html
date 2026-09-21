@@ -216,6 +216,74 @@ const ART = {
 };
 </script>
 
+<!-- ============================================================
+     LATTICE DB — the only part of the page that knows Firestore
+     exists. Everything below this script talks to `window.LatticeDB`
+     and never touches `firebase*` imports directly, so swapping the
+     backend later (or adding retries, caching, whatever) only ever
+     means editing this one block.
+
+     Module scripts execute deferred (after the page is parsed), so
+     the classic script further down can't assume LatticeDB exists
+     the instant it starts running — it waits for the 'lattice:ready'
+     event instead (see the boot() function below).
+     ============================================================ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, getDocs, query, orderBy, limit,
+    doc, runTransaction, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  // Analytics is intentionally left out. LATTICE runs anonymously with
+  // no accounts by design — adding tracking nobody agreed to would cut
+  // against that on purpose, not by oversight.
+  const firebaseConfig = {
+    apiKey: "AIzaSyDl32I3wTqjdNKRloDCI4iqVAyDIrN80Hw",
+    authDomain: "lattice-731c2.firebaseapp.com",
+    projectId: "lattice-731c2",
+    storageBucket: "lattice-731c2.firebasestorage.app",
+    messagingSenderId: "593182874170",
+    appId: "1:593182874170:web:6f96289b5e26102b9cb303"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const messagesCol = collection(db, 'messages');
+
+  // fetched once per visit (not a live subscription) — matches the
+  // "load fresh each visit" choice: simpler, and matches how people
+  // actually arrive here, via a scanned QR code, not a left-open tab
+  async function fetchMessages(cap = 300){
+    const q = query(messagesCol, orderBy('createdAt', 'desc'), limit(cap));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, t: d.data().text, left: d.data().left || [] }));
+  }
+
+  async function postMessage(text){
+    const ref = await addDoc(messagesCol, { text, left: [], createdAt: serverTimestamp() });
+    return ref.id;
+  }
+
+  // NOT arrayUnion: arrayUnion silently drops a value already present
+  // in the array, but `left` is supposed to accumulate repeats (a
+  // second acorn on the same message has to actually show up twice).
+  // A transaction reads the current array and appends for real, and
+  // Firestore retries it automatically if two gifts land at once.
+  async function giveGift(messageId, item){
+    const ref = doc(db, 'messages', messageId);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new Error('message no longer exists');
+      const current = snap.data().left || [];
+      tx.update(ref, { left: [...current, item] });
+    });
+  }
+
+  window.LatticeDB = { fetchMessages, postMessage, giveGift };
+  window.dispatchEvent(new Event('lattice:ready'));
+</script>
+
 <div class="col">
   <div class="mast">
     <h1>LATTICE</h1>
@@ -269,78 +337,32 @@ const ART = {
 const LIMIT=200, rnd=(a,b)=>a+Math.random()*(b-a);
 const ico = k => ART[k] ? `<img src="${ART[k]}" alt="${k}">` : '';
 
-let messages=[
-  {t:"The night my roommates and I ate cold pizza on the kitchen floor because the table wasn't built yet.", left:['leaf','acorn','leaf','acorn','leaf','acorn','leaf'], mine:false},
-  {t:"A stranger at the laundromat held the door with her foot and said take your time, honey.", left:['acorn','leaf'], mine:false},
-  {t:"Standing in the back at a show where I knew nobody and everyone knew the words.", left:['acorn','acorn','wing','leaf'], mine:false},
-  {t:"Sunday dinners at my grandmother's. Twelve years ago now. I can still hear the chairs scraping.", left:['leaf','acorn','leaf','acorn','wing','leaf','acorn','leaf','acorn','leaf','acorn','leaf','wing','acorn'], mine:false},
-  {t:"When the barista started making my order before I said it.", left:['leaf'], mine:false},
-  {t:"Honestly, not for a long time. But I liked reading these.", left:['acorn','acorn','leaf'], mine:false},
-  {t:"On a bus at 2am with six people I'd met that week, all of us asleep except the driver.", left:[], mine:false}
+// user-written text is untrusted the moment it can come from a stranger
+// via Firestore, not just from this one browser — escape before it ever
+// reaches innerHTML
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+}
+
+// shown only if Firestore can't be reached, or the wall is genuinely
+// empty (nothing seeded yet) — never written to the database, purely
+// a local "don't show a blank page" fallback
+const FALLBACK_SEED_MESSAGES=[
+  {t:"The night my roommates and I ate cold pizza on the kitchen floor because the table wasn't built yet.", left:['leaf','acorn','leaf','acorn','leaf','acorn','leaf']},
+  {t:"A stranger at the laundromat held the door with her foot and said take your time, honey.", left:['acorn','leaf']},
+  {t:"Standing in the back at a show where I knew nobody and everyone knew the words.", left:['acorn','acorn','wing','leaf']},
+  {t:"Sunday dinners at my grandmother's. Twelve years ago now. I can still hear the chairs scraping.", left:['leaf','acorn','leaf','acorn','wing','leaf','acorn','leaf','acorn','leaf','acorn','leaf','wing','acorn']},
+  {t:"When the barista started making my order before I said it.", left:['leaf']},
+  {t:"Honestly, not for a long time. But I liked reading these.", left:['acorn','acorn','leaf']},
+  {t:"On a bus at 2am with six people I'd met that week, all of us asleep except the driver.", left:[]}
 ];
 
-/* ---- pocket: persists per device via localStorage, refills on a timer ----
-   Design choice worth knowing about: if the pocket is already full when a
-   27-hour period completes, that refill is "owed" rather than dropped —
-   it doesn't advance the clock, so the moment a slot opens up (an item is
-   given away), the owed item appears right away instead of making the
-   person wait out a fresh 27 hours on top of the wait they already did. */
-const POCKET_KEY = 'lattice_pocket_v1';
-const REFILL_MS = 27 * 60 * 60 * 1000;
-const POCKET_CAP = 4;
-
-function randomItem(){
-  const r = Math.random();
-  if (r < 0.20) return 'wing';       // 20% wing
-  return r < 0.60 ? 'leaf' : 'acorn'; // 40% leaf, 40% acorn
-}
-function loadPocketState(){
-  try { const raw = localStorage.getItem(POCKET_KEY); if (raw) return JSON.parse(raw); }
-  catch(e){}
-  return null;
-}
-function savePocketState(state){
-  try { localStorage.setItem(POCKET_KEY, JSON.stringify(state)); } catch(e){}
-}
-// each completed 27-hour period is consumed on schedule, whether or not
-// there was room for it — a full pocket wastes the refill rather than
-// banking it for later, so nothing is owed once a slot next opens up
-function applyOwedRefills(state){
-  const now = Date.now();
-  let changed = false;
-  while ((now - state.lastRefill) >= REFILL_MS){
-    if (state.items.length < POCKET_CAP){
-      state.items.push(randomItem());
-      changed = true;
-    }
-    state.lastRefill += REFILL_MS;   // period used up either way
-  }
-  return changed;
-}
-
-let isFirstVisit = false;
-let pocketState = loadPocketState();
-if (!pocketState){
-  isFirstVisit = true;
-  const starting = ['acorn','leaf','acorn'];
-  if (Math.random() < 0.22) starting.push('wing');
-  pocketState = { items: starting, lastRefill: Date.now() };
-}
-applyOwedRefills(pocketState);
-savePocketState(pocketState);
-let pocket = pocketState.items;
-
-// in case a tab is left open across a 27-hour boundary, without needing a reload
-setInterval(() => {
-  if (applyOwedRefills(pocketState)){ savePocketState(pocketState); drawPocket(); }
-}, 5*60*1000);
+let messages = [];
 
 const wrap=document.getElementById('messages');
 
-/* one continuous plant, rooted below the oldest message, climbing the
-   whole column. depth 0 = top (newest), depth 1 = bottom (oldest).
-   strength is a pure function of pixel position, not of which note
-   you're "in" — so nothing resets or restarts between messages. */
 /* one continuous plant, rooted below the oldest message, climbing the
    whole column. depth 0 = top (newest), depth 1 = bottom (oldest).
    strength is a pure function of pixel position, not of which note
@@ -390,7 +412,7 @@ function noteRng(seedNum){
 }
 
 // builds the decal elements for one note's corner, given its stage.
-// CORNER_X/Y below are where, in field-local px, that corner sits.
+// cx/cy below are where, in field-local px, that corner sits.
 function decalsForCorner(corner, stage, cx, cy, rng){
   const spec = CORNER_ART[stage];
   if (!spec || !spec.corners.includes(corner)) return [];
@@ -539,6 +561,60 @@ function renderVines(){
   requestAnimationFrame(tick);
 })();
 
+/* ---- pocket: persists per device via localStorage, refills on a timer ----
+   Full pocket WASTES a refill rather than banking it — every 27-hour
+   period is consumed on schedule whether or not there was room, so
+   sitting at the cap for a while doesn't queue up freebies for later. */
+const POCKET_KEY = 'lattice_pocket_v1';
+const REFILL_MS = 27 * 60 * 60 * 1000;
+const POCKET_CAP = 4;
+
+function randomItem(){
+  const r = Math.random();
+  if (r < 0.20) return 'wing';       // 20% wing
+  return r < 0.60 ? 'leaf' : 'acorn'; // 40% leaf, 40% acorn
+}
+function loadPocketState(){
+  try { const raw = localStorage.getItem(POCKET_KEY); if (raw) return JSON.parse(raw); }
+  catch(e){}
+  return null;
+}
+function savePocketState(state){
+  try { localStorage.setItem(POCKET_KEY, JSON.stringify(state)); } catch(e){}
+}
+// each completed 27-hour period is consumed on schedule, whether or not
+// there was room for it — a full pocket wastes the refill rather than
+// banking it for later, so nothing is owed once a slot next opens up
+function applyOwedRefills(state){
+  const now = Date.now();
+  let changed = false;
+  while ((now - state.lastRefill) >= REFILL_MS){
+    if (state.items.length < POCKET_CAP){
+      state.items.push(randomItem());
+      changed = true;
+    }
+    state.lastRefill += REFILL_MS;   // period used up either way
+  }
+  return changed;
+}
+
+let isFirstVisit = false;
+let pocketState = loadPocketState();
+if (!pocketState){
+  isFirstVisit = true;
+  const starting = ['acorn','leaf','acorn'];
+  if (Math.random() < 0.22) starting.push('wing');
+  pocketState = { items: starting, lastRefill: Date.now() };
+}
+applyOwedRefills(pocketState);
+savePocketState(pocketState);
+let pocket = pocketState.items;
+
+// in case a tab is left open across a 27-hour boundary, without needing a reload
+setInterval(() => {
+  if (applyOwedRefills(pocketState)){ savePocketState(pocketState); drawPocket(); }
+}, 5*60*1000);
+
 function render(){
   wrap.innerHTML=messages.map((m,i)=>{
     const shown=m.mine?'':m.left.map(k=>`<i>${ico(k)}</i>`).join('');
@@ -546,7 +622,7 @@ function render(){
       `<button data-msg="${i}" data-slot="${j}" title="leave ${k}" aria-label="Leave ${k}">${ico(k)}<span>${k}</span></button>`).join('')}</div>`;
     return `<div class="note">
       <div class="frame">
-        <div class="plate">${m.t}</div>
+        <div class="plate">${escapeHtml(m.t)}</div>
         <div class="rail"><div class="left">${shown}</div>${give}</div>
       </div></div>`;
   }).join('');
@@ -571,9 +647,15 @@ function observe(){
 wrap.addEventListener('click',e=>{
   const b=e.target.closest('button[data-slot]'); if(!b) return;
   const mi=+b.dataset.msg, slot=+b.dataset.slot, tok=pocket[slot]; if(!tok) return;
-  pocket.splice(slot,1); messages[mi].left.push(tok);
+  const msg = messages[mi]; if(!msg) return;
+  pocket.splice(slot,1); msg.left.push(tok);
   applyOwedRefills(pocketState); savePocketState(pocketState);
   render();
+  if (msg.id){
+    LatticeDB.giveGift(msg.id, tok).catch(err => {
+      console.warn('LATTICE: gift did not save to the wall (still shows locally this visit):', err);
+    });
+  }
 });
 
 /* ---- arrival: shows the pocket's current contents every visit — what's
@@ -647,14 +729,44 @@ text.addEventListener('input',()=>{
   count.textContent=r; count.className='rem'+(r<0?' over':'');
   leave.disabled=!text.value.trim()||r<0;
 });
-leave.onclick=()=>{
-  messages.unshift({t:text.value.trim(),left:[],mine:true});
-  text.value=''; count.textContent=LIMIT; leave.disabled=true;
+leave.onclick=async ()=>{
+  const value = text.value.trim();
+  if (!value) return;
+  leave.disabled = true; leave.textContent = 'Sending…';
+  let id;
+  try {
+    id = await LatticeDB.postMessage(value);
+  } catch(err){
+    console.warn('LATTICE: could not post message:', err);
+    leave.textContent = 'Try again'; leave.disabled = false;
+    return;
+  }
+  messages.unshift({ id, t: value, left: [], mine:true });
+  text.value=''; count.textContent=LIMIT;
+  leave.textContent='Leave it'; leave.disabled=true;
   veil.classList.remove('on'); fEl.classList.remove('live'); quill.classList.remove('live','in');
   render(); scrollTo({top:0,behavior:'smooth'});
 };
 
 window.lattice={open(){['teacup','pinwheel'].forEach(k=>{if(!pocket.includes(k))pocket.push(k)});savePocketState(pocketState);render();return'teacup and pinwheel are in your pocket.'}};
 
-render();
+/* ---- boot: fetch the wall once, then do the first render.
+   Waits for 'lattice:ready' from the module script above rather than
+   assuming it has already run, since module scripts execute deferred
+   and may not have finished by the time this classic script reaches
+   here. ---- */
+async function boot(){
+  try {
+    const fetched = await LatticeDB.fetchMessages();
+    messages = fetched.length
+      ? fetched.map(m => ({...m, mine:false}))
+      : FALLBACK_SEED_MESSAGES.map(m => ({...m, id:null, mine:false}));
+  } catch(err){
+    console.warn('LATTICE: could not reach the wall, showing local messages instead:', err);
+    messages = FALLBACK_SEED_MESSAGES.map(m => ({...m, id:null, mine:false}));
+  }
+  render();
+}
+if (window.LatticeDB) boot();
+else window.addEventListener('lattice:ready', boot, {once:true});
 </script>
