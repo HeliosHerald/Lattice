@@ -208,7 +208,7 @@
        row — a flex row with no wrap is what was cutting items off the
        edge of the screen. Also shrunk so up to POCKET_CAP items always
        fit without scrolling on an ordinary phone screen. */
-    #arrive .hand{flex-direction:column;gap:14px;max-height:84vh;overflow-y:auto}
+    #arrive .hand{flex-direction:column;gap:14px}
     #arrive .hand i{padding:10px 14px}
     #arrive .hand i img{height:72px}
   }
@@ -553,11 +553,16 @@ function renderVines(){
   const REGROW_DELAY  = 1300;  // ms of stillness before it starts growing back
   const SWAY_MAX      = 13;    // px of lateral sway at the strongest scroll kick
   const SWAY_DECAY    = 0.90;  // per-frame damping of the sway spring
+  const TOUCH_SWIPE_PX = 10;   // a touch has to actually move this far before it
+                                // counts as a swipe — a plain tap should do nothing,
+                                // and this is also what stops mobile's fingerdown at
+                                // the very start of a page-scroll from reading as a brush
 
   let lastClientX = -9999, lastClientY = -9999;
   let holeX = -999, holeY = -999, holeR = 0, holeTargetR = 0;
   let regrowTimer = null;
   let swayX = 0, lastScrollY = window.scrollY;
+  let touchStartX = null, touchStartY = null, touchIsSwiping = false;
 
   function updateHoleFromLast(){
     const field = document.getElementById('vinefield');
@@ -571,12 +576,38 @@ function renderVines(){
     holeY = lastClientY - rect.top;
   }
 
+  function scheduleRegrow(){
+    clearTimeout(regrowTimer);
+    regrowTimer = setTimeout(() => { holeTargetR = 0; }, REGROW_DELAY);
+  }
+
   function onPointerMove(e){
+    // touch: require real movement before it counts as a swipe, so tapping a
+    // message never clears growth — only a deliberate drag does, and it keeps
+    // following the finger for as long as the swipe continues
+    if (e.pointerType === 'touch'){
+      if (touchStartX == null){ touchStartX = e.clientX; touchStartY = e.clientY; }
+      if (!touchIsSwiping){
+        const moved = Math.hypot(e.clientX - touchStartX, e.clientY - touchStartY);
+        if (moved < TOUCH_SWIPE_PX) return;
+        touchIsSwiping = true;
+      }
+    }
     lastClientX = e.clientX; lastClientY = e.clientY;
     updateHoleFromLast();
     holeTargetR = BRUSH_R;
-    clearTimeout(regrowTimer);
-    regrowTimer = setTimeout(() => { holeTargetR = 0; }, REGROW_DELAY);
+    scheduleRegrow();
+  }
+
+  // belt-and-suspenders: whatever happens mid-touch (the OS deciding it's a
+  // scroll and cancelling the pointer session, a stray missed event), lifting
+  // the finger always guarantees the clearing starts fading back — it can
+  // never get stuck open
+  function onTouchEnd(e){
+    if (e.pointerType !== 'touch') return;
+    touchStartX = touchStartY = null;
+    touchIsSwiping = false;
+    scheduleRegrow();
   }
 
   function onScroll(){
@@ -605,6 +636,8 @@ function renderVines(){
   }
 
   window.addEventListener('pointermove', onPointerMove, {passive:true});
+  window.addEventListener('pointerup', onTouchEnd, {passive:true});
+  window.addEventListener('pointercancel', onTouchEnd, {passive:true});
   window.addEventListener('scroll', onScroll, {passive:true});
   requestAnimationFrame(tick);
 })();
