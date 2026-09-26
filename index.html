@@ -323,16 +323,13 @@ const ART = {
 </script>
 
 <!-- ============================================================
-     LATTICE DB — the only part of the page that knows Firestore
-     exists. Everything below this script talks to `window.LatticeDB`
-     and never touches `firebase*` imports directly, so swapping the
-     backend later (or adding retries, caching, whatever) only ever
-     means editing this one block.
-
-     Module scripts execute deferred (after the page is parsed), so
-     the classic script further down can't assume LatticeDB exists
-     the instant it starts running — it waits for the 'lattice:ready'
-     event instead (see the boot() function below).
+     LATTICE DB — writing to Firestore (posting a message, leaving an
+     item) goes through `window.LatticeDB` here. READING the wall does
+     not: boot() further down reads it with one plain request to
+     Firestore's REST API, so the wall shows up without waiting for
+     this library to download. Module scripts execute deferred, so
+     LatticeDB may not exist for the first moment; posting before it
+     loads just shows "Try again".
      ============================================================ -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -1036,15 +1033,44 @@ leave.onclick=async ()=>{
 window.lattice={open(){['teacup','pinwheel'].forEach(k=>{if(!pocket.includes(k))pocket.push(k)});savePocketState(pocketState);render();return'teacup and pinwheel are in your pocket.'}};
 
 /* ---- boot: fetch the wall once, then do the first render.
-   Waits for 'lattice:ready' from the module script above rather than
-   assuming it has already run, since module scripts execute deferred
-   and may not have finished by the time this classic script reaches
-   here. ---- */
-let booted = false;
-async function boot(){
-  booted = true;
+   Reads the wall with ONE plain HTTPS request to Firestore's REST API instead
+   of the Firebase library. Why: the library has to download first (a few
+   hundred KB — slow on a phone) and then reads over a streaming connection
+   that some phone networks and iOS Safari stall; the library waits ~10s
+   before it gives up and falls back. A single request has neither problem,
+   starts immediately, and returns identical data. (The Firebase library still
+   handles posting and leaving items; it loads in the background.)
+   The same security rules apply to this request as to the library. ---- */
+const WALL_URL = "https://firestore.googleapis.com/v1/projects/lattice-731c2/databases/(default)/documents:runQuery?key=AIzaSyDl32I3wTqjdNKRloDCI4iqVAyDIrN80Hw";
+const WALL_TIMEOUT_MS = 8000;   // a stuck request falls back to the seed messages instead of a blank wall
+async function fetchWall(cap = 300){
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), WALL_TIMEOUT_MS);
   try {
-    const fetched = await LatticeDB.fetchMessages();
+    const r = await fetch(WALL_URL, {
+      method: "POST", signal: ctl.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ structuredQuery: {
+        from: [{ collectionId: "messages" }],
+        orderBy: [{ field: { fieldPath: "createdAt" }, direction: "DESCENDING" }],
+        limit: cap
+      }})
+    });
+    if (!r.ok) throw new Error("wall request failed: HTTP " + r.status);
+    const rows = await r.json();
+    return rows.filter(row => row.document).map(row => {
+      const f = row.document.fields || {};
+      return {
+        id: row.document.name.split("/").pop(),
+        t: (f.text && f.text.stringValue) || "",
+        left: ((f.left && f.left.arrayValue && f.left.arrayValue.values) || []).map(v => v.stringValue)
+      };
+    });
+  } finally { clearTimeout(timer); }
+}
+async function boot(){
+  try {
+    const fetched = await fetchWall();
     messages = fetched.length
       ? fetched.map(m => ({...m, mine:false}))
       : FALLBACK_SEED_MESSAGES.map(m => ({...m, id:null, mine:false}));
@@ -1054,13 +1080,5 @@ async function boot(){
   }
   render();
 }
-if (window.LatticeDB) boot();
-else {
-  window.addEventListener('lattice:ready', boot, {once:true});
-  // ad-blockers and strict school/work networks sometimes block Google's
-  // scripts outright, so 'lattice:ready' never fires. Don't leave a blank
-  // wall: fall back to the seed messages, and if Firebase does turn up late,
-  // the listener above re-boots with the real wall.
-  setTimeout(() => { if (!booted) boot(); }, 5000);
-}
+boot();
 </script>
