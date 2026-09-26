@@ -135,11 +135,11 @@
   #feather.live{display:block;pointer-events:auto}   /* tappable mid-fall */
   #feather svg{width:100%;height:100%}
 
-  /* the write button. It has one fixed home (bottom-right, just above the
-     pocket bar) so people learn where it is; the feather falls INTO it.
-     It's in the page from the start but invisible and unclickable until
-     the feather lands — except for keyboard users, who can tab to it and
-     it appears on focus. */
+  /* the write button. One fixed home (bottom-right, just above the pocket
+     bar) so people learn where it is. It shows up as soon as the pocket
+     intro fades — with an empty slot where its feather icon goes — and the
+     feather drifts down into that slot. Keyboard users can tab to it even
+     earlier; it appears on focus. */
   #quill{
     position:fixed;z-index:32;display:flex;align-items:center;gap:10px;
     right:16px;bottom:70px;
@@ -156,7 +156,10 @@
   #quill:hover{background:#D6D6D6}
   #quill:active{border-color:var(--dk) var(--hi) var(--hi) var(--dk);
                 box-shadow:none;transform:translate(3px,3px)}
-  #quill svg{width:30px;height:30px;flex:none}
+  #quill svg{width:30px;height:30px;flex:none;transition:opacity .3s}
+  #quill.awaiting svg{opacity:0}            /* the slot the feather will land in */
+  #quill.caught{animation:catch .6s ease}
+  @keyframes catch{0%{transform:scale(1)}35%{transform:scale(1.07)}100%{transform:scale(1)}}
   #quill em{font-style:normal;display:block;font-weight:normal;font-size:11px;opacity:.7}
   @media (max-width:560px){ #quill{font-size:13px;padding:8px 11px 8px 8px;right:10px;bottom:62px} }
 
@@ -814,58 +817,73 @@ if (pocket.length){
 }
 
 /* ---- feather ----
-   The feather ANNOUNCES the write button; it doesn't gate it. The button
-   (#quill) has a fixed home above the pocket bar. The feather falls once the
-   visitor has read a couple of messages — or 5s after the pocket intro,
-   whichever comes first — takes FALL_MS to drift down, settles into the
-   button's icon, and hands off to it. Tapping the feather mid-fall opens the
-   writer. With reduced motion on, there's no fall: the button just appears.
-   (Before: a 10s wait plus a ~10s drift, landing somewhere random, and the
-   only way to write — see Nielsen's 10-second attention limit and WCAG 2.2.2.) */
+   The write button (#quill) is available as soon as the pocket intro fades,
+   with an empty slot where its feather icon goes. The feather is the
+   eye-catcher, not a gate: once the visitor has read a couple of messages
+   (or 3s after the intro), it drifts down at a real feather's pace, sways,
+   and settles into the button's empty slot — the button gives a small
+   "catch." Because nobody has to wait for it, it can take its time.
+   Tapping the feather mid-fall opens the writer. Reduced motion: no fall,
+   the icon is simply there. */
 const cv=document.getElementById('plume'), ctx=cv.getContext('2d'), fEl=document.getElementById('feather');
 const quillEl=document.getElementById('quill');
-const FALL_MS = 2400;          // well under WCAG's 5s limit for motion that starts on its own
+const FALL_SPEED = 85;          // px per second — ~10s down a phone screen, like the original drift
 const TIMER_FALLBACK_MS = 3000; // after the pocket intro, if nobody's scrolled yet
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 if (matchMedia('(pointer: coarse)').matches){
   const s = quillEl.querySelector('span');
   if (s && s.firstChild) s.firstChild.nodeValue = 'Tap here to write';
 }
+if (!reduceMotion) quillEl.classList.add('awaiting');
 let trail=[], fx=0, fy=-70, t0=0, drift=false, ph=rnd(0,6.28), raf=0;
-let startX=0, targetX=0, targetY=0, feathered=false;
+let startX=0, targetX=0, targetY=0, fallMs=0, feathered=false;
 const size=()=>{cv.width=innerWidth;cv.height=innerHeight}; size();
 
-function revealQuill(){
+// the button itself: up as soon as the intro is out of the way
+setTimeout(() => quillEl.classList.add('in'), arrivalMs + 1500);
+
+function landFeather(){
   drift=false;
   fEl.classList.remove('live');
+  const wasWaiting = quillEl.classList.contains('awaiting');
+  quillEl.classList.remove('awaiting');
   quillEl.classList.add('in');
+  if (wasWaiting){
+    quillEl.classList.add('caught');
+    setTimeout(() => quillEl.classList.remove('caught'), 700);
+  }
 }
 function launch(){
-  // aim for the centre of the button's own feather icon, wherever the
-  // button sits at this screen size
+  // aim for the centre of the button's (empty) icon slot at this screen size
   const icon = quillEl.querySelector('svg').getBoundingClientRect();
   targetX = icon.left + icon.width/2 - 32;
   targetY = icon.top  + icon.height/2 - 32;
-  startX = Math.max(16, Math.min(innerWidth-88, innerWidth*0.4 + rnd(-50,50)));
+  startX = Math.max(16, Math.min(innerWidth-88, innerWidth*0.45 + rnd(-60,60)));
+  fallMs = (targetY + 70) / FALL_SPEED * 1000;
   fy=-70; ph=rnd(0,6.28); drift=true; trail=[];
   fEl.classList.add('live'); t0=performance.now();
   cancelAnimationFrame(raf); raf=requestAnimationFrame(step);
 }
+// vertical progress: steady fall, then a soft slow-down over the last 15%
+// (the two pieces meet at the same speed, so there's no visible hitch)
+const K = 1/(0.85 + 0.075);
+const fallCurve = p => p < 0.85 ? K*p : K*0.85 + K*0.075*(2*((p-.85)/.15) - ((p-.85)/.15)**2);
 function step(now){
   if(drift){
-    const p = Math.min(1, (now-t0)/FALL_MS);
-    const e = p<.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;   // ease in-out
-    const settle = 1-e;                                // sway dies down as it lands
+    const p = Math.min(1, (now-t0)/fallMs);
     const t = (now-t0)/1000;
-    fx = startX + (targetX-startX)*e + Math.sin(t*2.6+ph)*46*settle;
-    fy = -70 + (targetY+70)*e;
-    const rot = Math.sin(t*2.6+ph)*24*settle;
-    const sc = p<.8 ? 1 : 1 - (p-.8)/.2*0.53;          // shrinks down to the icon's size
+    const ey = fallCurve(p);
+    const settle = p < 0.7 ? 1 : 1 - ((p-0.7)/0.3)**2;     // sway narrows only near the end
+    const sway = Math.sin(t*1.02+ph)*72 + Math.sin(t*2.25+ph)*16;
+    fx = startX + (targetX-startX)*ey + sway*settle;
+    fy = -70 + (targetY+70)*ey;
+    const rot = Math.sin(t*1.02+ph)*27*settle;
+    const sc = p < 0.9 ? 1 : 1 - (p-0.9)/0.1*0.53;          // shrinks down to icon size as it settles
     fEl.style.transform=`translate(${fx.toFixed(1)}px,${fy.toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)})`;
-    if (p < .85) trail.push({x:fx+32,y:fy+34,a:1,s:rnd(2,4)});
-    if (p >= 1) revealQuill();
+    if (p < 0.9) trail.push({x:fx+32,y:fy+34,a:1,s:rnd(2,4)});
+    if (p >= 1) landFeather();
   }
-  trail.forEach(p=>{p.a-=.02;p.y+=.13});
+  trail.forEach(p=>{p.a-=.011;p.y+=.13});
   trail=trail.filter(p=>p.a>0);
   ctx.clearRect(0,0,cv.width,cv.height);
   trail.forEach(p=>{ // square, quantized — halftone-ish, not soft
@@ -879,7 +897,7 @@ function triggerFeather(){
   if (feathered) return;
   feathered = true;
   removeEventListener('scroll', onReadScroll);
-  if (reduceMotion) revealQuill(); else launch();
+  if (reduceMotion) landFeather(); else launch();
 }
 // "read a couple first": once the third message is well into view, the
 // visitor has scrolled past two. Ignored while the pocket intro still covers the page.
@@ -893,7 +911,7 @@ function onReadScroll(){
 }
 addEventListener('scroll', onReadScroll, {passive:true});
 setTimeout(triggerFeather, arrivalMs + 1500 + TIMER_FALLBACK_MS);
-fEl.addEventListener('click', ()=>{ revealQuill(); openWrite(); });
+fEl.addEventListener('click', ()=>{ landFeather(); openWrite(); });
 addEventListener('resize', ()=>{ size(); clearTimeout(window.__g); window.__g=setTimeout(renderVines,180); });
 
 /* ---- compose ---- */
