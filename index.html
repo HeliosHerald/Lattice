@@ -132,27 +132,33 @@
   #feather{position:fixed;top:0;left:0;z-index:31;width:64px;height:64px;
            background:none;border:none;padding:0;cursor:pointer;display:none;
            pointer-events:none}
-  #feather.live{display:block}
+  #feather.live{display:block;pointer-events:auto}   /* tappable mid-fall */
   #feather svg{width:100%;height:100%}
 
-  /* the prompt the feather leaves behind when it lands */
+  /* the write button. It has one fixed home (bottom-right, just above the
+     pocket bar) so people learn where it is; the feather falls INTO it.
+     It's in the page from the start but invisible and unclickable until
+     the feather lands — except for keyboard users, who can tab to it and
+     it appears on focus. */
   #quill{
-    position:fixed;z-index:32;display:none;align-items:center;gap:10px;
+    position:fixed;z-index:32;display:flex;align-items:center;gap:10px;
+    right:16px;bottom:70px;
     background:var(--chrome);cursor:pointer;
     border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi);
     box-shadow:4px 4px 0 rgba(0,0,0,.4);
     padding:9px 14px 9px 10px;
     font:bold 14px Helvetica,Arial,sans-serif;color:#111;
-    opacity:0;transform:translateY(6px);transition:opacity .5s ease, transform .5s ease;
+    opacity:0;transform:translateY(6px);pointer-events:none;
+    transition:opacity .5s ease, transform .5s ease;
   }
-  #quill.live{display:flex}
-  #quill.in{opacity:1;transform:translateY(0)}
+  #quill.in, #quill:focus-visible{opacity:1;transform:translateY(0);pointer-events:auto}
+  #quill.done{display:none}
   #quill:hover{background:#D6D6D6}
   #quill:active{border-color:var(--dk) var(--hi) var(--hi) var(--dk);
                 box-shadow:none;transform:translate(3px,3px)}
   #quill svg{width:30px;height:30px;flex:none}
   #quill em{font-style:normal;display:block;font-weight:normal;font-size:11px;opacity:.7}
-  @media (max-width:560px){ #quill{font-size:13px;padding:8px 11px 8px 8px} }
+  @media (max-width:560px){ #quill{font-size:13px;padding:8px 11px 8px 8px;right:10px;bottom:62px} }
 
   /* ---- compose ---- */
   .veil{position:fixed;inset:0;background:rgba(8,10,120,.86);display:none;
@@ -347,8 +353,8 @@ const ART = {
 <canvas id="plume"></canvas>
 <div id="quill" role="button" tabindex="0">
   <svg viewBox="0 0 64 64" aria-hidden="true">
-    <path d="M54 8C34 13 18 28 13 48l-5 9" stroke="#333" stroke-width="2.4" fill="none"/>
-    <path d="M52 10C38 14 24 25 18 39c-3 7-4 11-5 14 4-1 9-3 15-7C46 37 51 24 52 10z" fill="#FAFAF2" stroke="#333" stroke-width="1.6"/>
+    <path d="M54 8C34 13 18 28 13 48l-5 9" stroke="#000" stroke-width="2" fill="none"/>
+    <path d="M52 10C38 14 24 25 18 39c-3 7-4 11-5 14 4-1 9-3 15-7C46 37 51 24 52 10z" fill="#AEE1F5" stroke="#000" stroke-width="1.6"/>
   </svg>
   <span>Click here to write<em>your answer joins the wall</em></span>
 </div>
@@ -541,13 +547,19 @@ function renderVines(){
   notes.forEach((note, i) => {
     const frame = note.querySelector('.frame');
     if (!frame) return;
-    const r = frame.getBoundingClientRect();
+    // how overgrown a note is still comes from where the whole box sits on
+    // the page — but the vines themselves anchor to the corners of the TEXT
+    // box (.plate), not the whole frame. The frame also contains the items
+    // row, which wraps to 2-3 lines on a phone; anchoring to the frame put
+    // the bottom corners' growth on the items instead of the words.
+    const fr = frame.getBoundingClientRect();
+    const frameCenterY = (fr.top + fr.bottom) / 2 - fieldRect.top;
+    const strength = strengthAt(Math.max(0, Math.min(1, frameCenterY / totalHeight)));
+    const r = (note.querySelector('.plate') || frame).getBoundingClientRect();
     const top    = r.top    - fieldRect.top;
     const bottom = r.bottom - fieldRect.top;
     const left   = r.left   - fieldRect.left;
     const right  = r.right  - fieldRect.left;
-    const centerY = (top + bottom) / 2;
-    const strength = strengthAt(Math.max(0, Math.min(1, centerY / totalHeight)));
     const stage = stageFor(strength);
     if (stage === 0) return;
 
@@ -801,27 +813,59 @@ if (pocket.length){
   arrive.remove();   // nothing to show if the pocket is currently empty
 }
 
-/* ---- feather ---- */
+/* ---- feather ----
+   The feather ANNOUNCES the write button; it doesn't gate it. The button
+   (#quill) has a fixed home above the pocket bar. The feather falls once the
+   visitor has read a couple of messages — or 5s after the pocket intro,
+   whichever comes first — takes FALL_MS to drift down, settles into the
+   button's icon, and hands off to it. Tapping the feather mid-fall opens the
+   writer. With reduced motion on, there's no fall: the button just appears.
+   (Before: a 10s wait plus a ~10s drift, landing somewhere random, and the
+   only way to write — see Nielsen's 10-second attention limit and WCAG 2.2.2.) */
 const cv=document.getElementById('plume'), ctx=cv.getContext('2d'), fEl=document.getElementById('feather');
-let trail=[], fx=0, fy=-70, t0=0, drift=false, rest=false, ph=rnd(0,6.28), raf=0;
+const quillEl=document.getElementById('quill');
+const FALL_MS = 2400;          // well under WCAG's 5s limit for motion that starts on its own
+const TIMER_FALLBACK_MS = 3000; // after the pocket intro, if nobody's scrolled yet
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (matchMedia('(pointer: coarse)').matches){
+  const s = quillEl.querySelector('span');
+  if (s && s.firstChild) s.firstChild.nodeValue = 'Tap here to write';
+}
+let trail=[], fx=0, fy=-70, t0=0, drift=false, ph=rnd(0,6.28), raf=0;
+let startX=0, targetX=0, targetY=0, feathered=false;
 const size=()=>{cv.width=innerWidth;cv.height=innerHeight}; size();
 
+function revealQuill(){
+  drift=false;
+  fEl.classList.remove('live');
+  quillEl.classList.add('in');
+}
 function launch(){
-  fy=-70; ph=rnd(0,6.28); drift=true; rest=false; trail=[];
+  // aim for the centre of the button's own feather icon, wherever the
+  // button sits at this screen size
+  const icon = quillEl.querySelector('svg').getBoundingClientRect();
+  targetX = icon.left + icon.width/2 - 32;
+  targetY = icon.top  + icon.height/2 - 32;
+  startX = Math.max(16, Math.min(innerWidth-88, innerWidth*0.4 + rnd(-50,50)));
+  fy=-70; ph=rnd(0,6.28); drift=true; trail=[];
   fEl.classList.add('live'); t0=performance.now();
   cancelAnimationFrame(raf); raf=requestAnimationFrame(step);
 }
 function step(now){
-  const t=(now-t0)/1000;
   if(drift){
-    fy=-70+t*62;
-    const sway=Math.sin(t*1.02+ph)*84+Math.sin(t*2.25+ph)*18;
-    fx=Math.max(16,Math.min(innerWidth-88, innerWidth/2+sway+Math.sin(ph)*78));
-    fEl.style.transform=`translate(${fx}px,${fy}px) rotate(${(Math.sin(t*1.02+ph)*27).toFixed(1)}deg)`;
-    trail.push({x:fx+32,y:fy+34,a:1,s:rnd(2,4)});
-    if(fy>innerHeight-190){drift=false;rest=true;land()}
+    const p = Math.min(1, (now-t0)/FALL_MS);
+    const e = p<.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;   // ease in-out
+    const settle = 1-e;                                // sway dies down as it lands
+    const t = (now-t0)/1000;
+    fx = startX + (targetX-startX)*e + Math.sin(t*2.6+ph)*46*settle;
+    fy = -70 + (targetY+70)*e;
+    const rot = Math.sin(t*2.6+ph)*24*settle;
+    const sc = p<.8 ? 1 : 1 - (p-.8)/.2*0.53;          // shrinks down to the icon's size
+    fEl.style.transform=`translate(${fx.toFixed(1)}px,${fy.toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)})`;
+    if (p < .85) trail.push({x:fx+32,y:fy+34,a:1,s:rnd(2,4)});
+    if (p >= 1) revealQuill();
   }
-  trail.forEach(p=>{p.a-=.011;p.y+=.13});
+  trail.forEach(p=>{p.a-=.02;p.y+=.13});
   trail=trail.filter(p=>p.a>0);
   ctx.clearRect(0,0,cv.width,cv.height);
   trail.forEach(p=>{ // square, quantized — halftone-ish, not soft
@@ -831,18 +875,26 @@ function step(now){
   });
   raf=(drift||trail.length)?requestAnimationFrame(step):0;
 }
-function land(){
-  const q = document.getElementById('quill');
-  const x = Math.max(12, Math.min(innerWidth - 250, fx - 8));
-  const y = Math.max(60, Math.min(innerHeight - 150, fy + 14));
-  q.style.left = x + 'px'; q.style.top = y + 'px';
-  q.classList.add('live');
-  fEl.classList.remove('live');
-  requestAnimationFrame(()=>q.classList.add('in'));
+function triggerFeather(){
+  if (feathered) return;
+  feathered = true;
+  removeEventListener('scroll', onReadScroll);
+  if (reduceMotion) revealQuill(); else launch();
 }
-
-setTimeout(launch, 10000 + arrivalMs);
-addEventListener('resize', ()=>{ size(); if(rest) land(); clearTimeout(window.__g); window.__g=setTimeout(renderVines,180); });
+// "read a couple first": once the third message is well into view, the
+// visitor has scrolled past two. Ignored while the pocket intro still covers the page.
+function onReadScroll(){
+  if (arrive.isConnected && !arrive.classList.contains('gone')) return;
+  const notes = document.querySelectorAll('.note');
+  const readTwo = notes.length >= 3
+    ? notes[2].getBoundingClientRect().top < innerHeight*0.6
+    : scrollY > 150;
+  if (readTwo) triggerFeather();
+}
+addEventListener('scroll', onReadScroll, {passive:true});
+setTimeout(triggerFeather, arrivalMs + 1500 + TIMER_FALLBACK_MS);
+fEl.addEventListener('click', ()=>{ revealQuill(); openWrite(); });
+addEventListener('resize', ()=>{ size(); clearTimeout(window.__g); window.__g=setTimeout(renderVines,180); });
 
 /* ---- compose ---- */
 const veil=document.getElementById('veil'), text=document.getElementById('text'),
@@ -873,7 +925,7 @@ leave.onclick=async ()=>{
   messages.unshift({ id, t: value, left: [], mine:true });
   text.value=''; count.textContent=LIMIT;
   leave.textContent='Leave it'; leave.disabled=true;
-  veil.classList.remove('on'); fEl.classList.remove('live'); quill.classList.remove('live','in');
+  veil.classList.remove('on'); feathered=true; drift=false; fEl.classList.remove('live'); quill.classList.remove('in'); quill.classList.add('done');
   render(); scrollTo({top:0,behavior:'smooth'});
 };
 
