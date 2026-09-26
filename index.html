@@ -1,5 +1,5 @@
 <!-- LATTICE -->
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <style>
   :root{
     --blue:#1418C8;
@@ -12,14 +12,19 @@
     --amber:#E8C46B; /* plate text color once boxes go black — distinct from the white ivy */
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0}
+  /* lock the page down like an app: no pinch-zoom (also set in the viewport
+     meta tag above), no horizontal pan or rubber-band bounce, no accidental
+     sideways drift from a vertical swipe. touch-action:pan-y still allows
+     normal up/down scrolling and the vine-swipe gesture — it only blocks
+     pinch and horizontal panning. */
+  html,body{margin:0;padding:0;width:100%;overflow-x:hidden;
+            touch-action:pan-y;overscroll-behavior-x:none;overscroll-behavior-y:contain}
   body{
     position:relative;
     background:var(--blue);
     color:#000;
     font:14px/1.5 Helvetica,Arial,"Helvetica Neue",sans-serif;
     -webkit-font-smoothing:none;
-    overflow-x:hidden;
   }
   /* halftone ground + faint plate grid, as on the card */
   #ground{
