@@ -1,4 +1,7 @@
+<!DOCTYPE html>
 <!-- LATTICE -->
+<meta charset="utf-8">
+<title>latticewall.xyz</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <style>
   :root{
@@ -13,12 +16,17 @@
   }
   *{box-sizing:border-box}
   /* lock the page down like an app: no pinch-zoom (also set in the viewport
-     meta tag above), no horizontal pan or rubber-band bounce, no accidental
-     sideways drift from a vertical swipe. touch-action:pan-y still allows
-     normal up/down scrolling and the vine-swipe gesture — it only blocks
-     pinch and horizontal panning. */
+     meta tag above), no horizontal pan, no accidental sideways drift from a
+     vertical swipe. touch-action:pan-y still allows normal up/down scrolling
+     and the vine-swipe gesture — it only blocks pinch and horizontal panning.
+     NOTE: this used to also set overscroll-behavior-y:contain to kill the
+     vertical rubber-band bounce, but that's a known cause of iOS Safari
+     intermittently locking scroll entirely near the top/bottom of the page
+     (the dynamic toolbar interacts badly with it) — dropped for that reason,
+     so a slight bounce at the very top/bottom is the tradeoff for scroll
+     actually working every time. */
   html,body{margin:0;padding:0;width:100%;overflow-x:hidden;
-            touch-action:pan-y;overscroll-behavior-x:none;overscroll-behavior-y:contain}
+            touch-action:pan-y;overscroll-behavior-x:none}
   body{
     position:relative;
     background:var(--blue);
@@ -53,6 +61,7 @@
     font:bold 21px/1.28 Helvetica,Arial,sans-serif;
     max-width:26ch;
   }
+  .mast .hint{margin:8px 0 0;color:#fff;font-size:11px;opacity:.7;letter-spacing:.02em}
   .sub{margin:16px 0 0;color:#fff;font-size:13px;opacity:.85;max-width:34ch}
 
   /* ---- a note ---- */
@@ -214,6 +223,16 @@
        edge of the screen. Also shrunk so up to POCKET_CAP items always
        fit without scrolling on an ordinary phone screen. */
     #arrive .hand{flex-direction:column;gap:14px}
+
+    /* a full pocket (4 items, one of them the wide wing) doesn't fit on one
+       line at phone width — let "leave one" wrap instead of pushing buttons
+       off-screen, and slim the pocket bar icons so the tray fits too */
+    .give{flex-wrap:wrap}
+    .pocket{gap:8px;padding:5px 8px}
+    .pocket .gardener{margin-left:2px}
+    .pocket .items{gap:3px;padding:3px 5px}
+    .pocket i{padding:2px 3px}
+    .pocket i img{height:18px}
     #arrive .hand i{padding:10px 14px}
     #arrive .hand i img{height:72px}
   }
@@ -277,7 +296,23 @@ const ART = {
 
   async function postMessage(text){
     const ref = await addDoc(messagesCol, { text, left: [], createdAt: serverTimestamp() });
+    notifyGardener(text, ref.id);
     return ref.id;
+  }
+
+  // emails Tristan through the same Formspree form as the contact page, with
+  // a direct link to the message in the Firebase console so a bad one can be
+  // deleted in two clicks. Fire-and-forget: if it fails, the post still stands.
+  function notifyGardener(text, id){
+    fetch("https://formspree.io/f/xzebnjql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({
+        _subject: "LATTICE — new message on the wall",
+        message: text,
+        delete_link: "https://console.firebase.google.com/project/lattice-731c2/firestore/databases/-default-/data/~2Fmessages~2F" + id
+      })
+    }).catch(() => {});
   }
 
   // NOT arrayUnion: arrayUnion silently drops a value already present
@@ -302,6 +337,7 @@ const ART = {
 <div class="col">
   <div class="mast">
     <h1>LATTICE</h1>
+    <p class="hint">swipe to uncover the oldest words.</p>
     <div class="ask">A moment you felt like you belonged.</div>
     <p class="sub">Others answered first. Read a few.</p>
   </div>
@@ -848,7 +884,9 @@ window.lattice={open(){['teacup','pinwheel'].forEach(k=>{if(!pocket.includes(k))
    assuming it has already run, since module scripts execute deferred
    and may not have finished by the time this classic script reaches
    here. ---- */
+let booted = false;
 async function boot(){
+  booted = true;
   try {
     const fetched = await LatticeDB.fetchMessages();
     messages = fetched.length
@@ -861,5 +899,12 @@ async function boot(){
   render();
 }
 if (window.LatticeDB) boot();
-else window.addEventListener('lattice:ready', boot, {once:true});
+else {
+  window.addEventListener('lattice:ready', boot, {once:true});
+  // ad-blockers and strict school/work networks sometimes block Google's
+  // scripts outright, so 'lattice:ready' never fires. Don't leave a blank
+  // wall: fall back to the seed messages, and if Firebase does turn up late,
+  // the listener above re-boots with the real wall.
+  setTimeout(() => { if (!booted) boot(); }, 5000);
+}
 </script>

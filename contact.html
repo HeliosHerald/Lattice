@@ -1,0 +1,147 @@
+<!-- LATTICE — contact -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LATTICE — leave a note for the gardener</title>
+<style>
+  :root{
+    --blue:#1418C8;
+    --blue-dk:#0C0EA0;
+    --chrome:#C6C6C6;
+    --hi:#FFFFFF;
+    --lo:#7A7A7A;
+    --dk:#000000;
+    --bone:#EDEAD8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    position:relative;min-height:100vh;
+    background:var(--blue);
+    color:#000;
+    font:14px/1.5 Helvetica,Arial,"Helvetica Neue",sans-serif;
+    -webkit-font-smoothing:none;
+    display:grid;place-items:center;
+    padding:40px 16px;
+  }
+  #ground{
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+      radial-gradient(rgba(255,255,255,.16) 34%, transparent 36%);
+    background-size:74px 74px, 74px 74px, 6px 6px;
+  }
+
+  .wrap{position:relative;z-index:2;width:100%;max-width:460px}
+
+  a.back{display:inline-block;margin-bottom:16px;color:#fff;opacity:.75;
+         font:bold 12px Helvetica,Arial,sans-serif;text-decoration:none;
+         letter-spacing:.03em}
+  a.back:hover{opacity:1;text-decoration:underline}
+
+  .box{background:var(--chrome);
+       border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi);
+       box-shadow:5px 5px 0 rgba(0,0,0,.4)}
+  .box .head{background:var(--blue-dk);color:#fff;font:bold 13px Helvetica,Arial,sans-serif;
+             padding:6px 9px;letter-spacing:.02em}
+  .box .in{padding:18px 16px 16px}
+
+  h1{margin:0 0 4px;font:bold 22px/1.15 Helvetica,Arial,sans-serif}
+  p.lede{margin:0 0 18px;font-size:12.5px;color:#333;opacity:.85;max-width:38ch}
+
+  label{display:block;font:bold 11px Helvetica,Arial,sans-serif;
+        text-transform:uppercase;letter-spacing:.05em;margin:0 0 5px;color:#222}
+  .field{margin-bottom:14px}
+  input[type=text],input[type=email],textarea{
+    width:100%;background:var(--bone);color:#111;
+    font:15px/1.5 Helvetica,Arial,sans-serif;padding:10px 11px;
+    border:2px solid;border-color:var(--lo) var(--hi) var(--hi) var(--lo)
+  }
+  textarea{min-height:130px;resize:vertical}
+  input:focus,textarea:focus{outline:1px dotted #000;outline-offset:-5px}
+  input::placeholder,textarea::placeholder{color:#8A8A8A}
+  .hint{font-size:11px;color:#555;margin-top:4px}
+
+  /* formspree field-level error text */
+  [data-fs-error]:not(#fs-form-error){display:block;font-size:11px;color:#B00000;
+                                       margin-top:4px;font-weight:bold}
+  input[aria-invalid="true"],textarea[aria-invalid="true"]{
+    border-color:#B00000 var(--hi) var(--hi) #B00000}
+
+  /* honeypot — hidden from real people, visible to bots that fill every field */
+  .hp{position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden}
+
+  .foot{margin-top:6px;display:flex;justify-content:flex-end;gap:8px}
+  .btn{min-width:96px;padding:8px 16px;cursor:pointer;
+       font:bold 13px Helvetica,Arial,sans-serif;background:var(--chrome);
+       border:2px solid;border-color:var(--hi) var(--dk) var(--dk) var(--hi);
+       box-shadow:2px 2px 0 rgba(0,0,0,.3)}
+  .btn:active{border-color:var(--dk) var(--hi) var(--hi) var(--dk);
+              box-shadow:none;transform:translate(2px,2px)}
+  .btn:hover{background:#D6D6D6}
+  .btn[disabled]{color:var(--lo);text-shadow:1px 1px 0 var(--hi);cursor:default;
+                 background:var(--chrome)}
+
+  #fs-form-success,#fs-form-error{margin-top:14px;font:bold 12px Helvetica,Arial,sans-serif;
+          padding:10px 11px;display:none;
+          border:2px solid;border-color:var(--lo) var(--hi) var(--hi) var(--lo)}
+  #fs-form-success:not(:empty),#fs-form-error:not(:empty){display:block}
+  #fs-form-success{background:#D8FFE0;color:#0B7A2E}
+  #fs-form-error{background:#FFE0E0;color:#B00000}
+
+  @media (max-width:480px){ h1{font-size:19px} }
+</style>
+
+<div id="ground"></div>
+
+<div class="wrap">
+  <a class="back" href="/">← back to the wall</a>
+  <div class="box">
+    <div class="head">leave a note for the gardener</div>
+    <div class="in">
+      <h1>Say something</h1>
+      <p class="lede">This goes to the person who tends LATTICE — not to the wall itself.
+        Leave your email only if you want a reply.</p>
+
+      <form id="cform" action="https://formspree.io/f/xzebnjql" method="POST">
+        <!-- honeypot field: real visitors never see or fill this -->
+        <div class="hp" aria-hidden="true">
+          <label for="_gotcha">Leave this empty</label>
+          <input type="text" id="_gotcha" name="_gotcha" tabindex="-1" autocomplete="off">
+        </div>
+
+        <div class="field">
+          <label for="name">Name <span style="text-transform:none;font-weight:normal;color:#666">(optional)</span></label>
+          <input type="text" id="name" name="name" placeholder="whoever you are" autocomplete="name" data-fs-field>
+          <span data-fs-error="name"></span>
+        </div>
+
+        <div class="field">
+          <label for="email">Your email <span style="text-transform:none;font-weight:normal;color:#666">(optional — only if you want a reply)</span></label>
+          <input type="email" id="email" name="_replyto" placeholder="you@example.com" autocomplete="email" data-fs-field>
+          <span data-fs-error="_replyto"></span>
+        </div>
+
+        <div class="field">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" required placeholder="what's on your mind" data-fs-field></textarea>
+          <span data-fs-error="message"></span>
+        </div>
+
+        <input type="hidden" name="_subject" value="LATTICE — new note">
+
+        <div class="foot">
+          <button class="btn" type="submit" data-fs-submit-btn>Send</button>
+        </div>
+      </form>
+
+      <div data-fs-success id="fs-form-success"></div>
+      <div data-fs-error id="fs-form-error"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.formspree = window.formspree || function () { (formspree.q = formspree.q || []).push(arguments); };
+  formspree('initForm', { formElement: '#cform', formId: 'xzebnjql' });
+</script>
+<script src="https://unpkg.com/@formspree/ajax@1" defer></script>
