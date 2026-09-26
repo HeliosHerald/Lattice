@@ -245,6 +245,69 @@
     #arrive .hand i{padding:10px 14px}
     #arrive .hand i img{height:72px}
   }
+/* ==== DESKTOP SCALE (generated) ====
+   Every px size above, x1.4, for screens 900px and wider —
+   the site's default desktop size. Regenerate this block after
+   editing sizes above instead of editing it by hand. */
+@media (min-width:900px){
+  body{font:19.6px/1.5 Helvetica,Arial,"Helvetica Neue",sans-serif}
+  #ground{background-image:
+      linear-gradient(rgba(255,255,255,.05) 1.4px, transparent 1.4px),
+      linear-gradient(90deg, rgba(255,255,255,.05) 1.4px, transparent 1.4px),
+      radial-gradient(rgba(255,255,255,.16) 34%, transparent 36%);background-size:103.6px 103.6px, 103.6px 103.6px, 8.4px 8.4px}
+  .col{max-width:924px;padding:72.8px 22.4px 126px}
+  .mast h1{font:bold 95.2px/.9 Helvetica,Arial,sans-serif}
+  .ask{margin:30.8px 0 0;border-width:2.8px;box-shadow:4.2px 4.2px 0 rgba(0,0,0,.35);padding:19.6px 25.2px;font:bold 29.4px/1.28 Helvetica,Arial,sans-serif}
+  .mast .hint{margin:11.2px 0 0;font-size:15.4px}
+  .sub{margin:22.4px 0 0;font-size:18.2px}
+  .note{margin:81.2px 0 0}
+  .frame{border-width:2.8px;box-shadow:5.6px 5.6px 0 rgba(0,0,0,.35);padding:12.6px}
+  .plate{border-width:2.8px;padding:25.2px 26.6px 28px;font:22.4px/1.62 Helvetica,Arial,sans-serif}
+  .rail{gap:16.8px;margin-top:12.6px}
+  .left{gap:7px;min-height:36.4px}
+  .left i{height:42px;padding:4.2px 5.6px;border-width:1.4px}
+  .left i img{height:33.6px}
+  .give{gap:4.2px}
+  .give{gap:7px}
+  .give .lab{font:bold 15.4px Helvetica,Arial,sans-serif;margin-right:2.8px}
+  .give button img{height:30.8px;padding:4.2px 5.6px}
+  .give button{gap:8.4px;padding:7px 12.6px 7px 7px;font:bold 15.4px Helvetica,Arial,sans-serif;border-width:2.8px;box-shadow:2.8px 2.8px 0 rgba(0,0,0,.3)}
+  .give button:active{transform:translate(2.8px,2.8px)}
+  .give button:focus-visible{outline:1.4px dotted #000;outline-offset:-7px}
+  .tag{font:bold 16.8px Helvetica,Arial,sans-serif}
+  #vinefield{--mx:-1398.6px;--my:-1398.6px;--mr:0px}
+  .vine-decal{filter:drop-shadow(1.4px 1.4px 0 rgba(0,0,0,.5))}
+  #feather{width:89.6px;height:89.6px}
+  #quill{gap:14px;right:22.4px;bottom:98px;border-width:2.8px;box-shadow:5.6px 5.6px 0 rgba(0,0,0,.4);padding:12.6px 19.6px 12.6px 14px;font:bold 19.6px Helvetica,Arial,sans-serif;transform:translateY(8.4px)}
+  #quill:active{transform:translate(4.2px,4.2px)}
+  #quill svg{width:42px;height:42px}
+  #quill em{font-size:15.4px}
+  .veil{padding:22.4px}
+  .box{max-width:644px;border-width:2.8px;box-shadow:7px 7px 0 rgba(0,0,0,.4)}
+  .box .head{font:bold 18.2px Helvetica,Arial,sans-serif;padding:7px 11.2px}
+  .box .head b{border-width:1.4px;width:25.2px}
+  .box .in{padding:19.6px}
+  .box .q{font:bold 21px/1.3 Helvetica,Arial,sans-serif;margin:0 0 14px}
+  textarea{min-height:168px;font:21px/1.55 Helvetica,Arial,sans-serif;padding:15.4px;border-width:2.8px}
+  textarea:focus{outline:1.4px dotted #000;outline-offset:-7px}
+  .foot{margin-top:15.4px}
+  .rem{font:16.8px "Courier New",monospace}
+  .btn{min-width:120.4px;padding:7px 16.8px;font:bold 18.2px Helvetica,Arial,sans-serif;border-width:2.8px}
+  .btn[disabled]{text-shadow:1.4px 1.4px 0 var(--hi)}
+  #arrive .hand{gap:36.4px}
+  #arrive .hand i{transform:translateY(19.6px) scale(1.25)}
+  #arrive .hand i{padding:19.6px 22.4px;border-width:2.8px}
+  #arrive .hand i img{height:154px}
+  .pocket{border-top-width:2.8px;padding:7px 16.8px;gap:14px}
+  .pocket .lab{font:bold 16.8px Helvetica,Arial,sans-serif}
+  .pocket .items-lab{font:bold 15.4px Helvetica,Arial,sans-serif}
+  .pocket .items{gap:7px;border-width:2.8px;padding:5.6px 12.6px;min-height:44.8px}
+  .pocket i{padding:4.2px 7px;border-width:1.4px}
+  .pocket i img{height:33.6px}
+  .pocket .none{font-size:15.4px}
+  .pocket .gardener{font-size:15.4px;margin-left:14px}
+}
+/* ==== END DESKTOP SCALE ==== */
 </style>
 
 <div id="ground"></div>
@@ -395,6 +458,11 @@ const ART = {
 
 <script>
 const LIMIT=200, rnd=(a,b)=>a+Math.random()*(b-a);
+// desktop default size: everything is 1.4x on screens 900px and wider (the CSS
+// half of this is the generated DESKTOP SCALE block at the end of <style>).
+// Sizes set from code — vines, brush, feather — multiply by this.
+const UI_MQ = matchMedia('(min-width: 900px)');
+const uiScale = () => UI_MQ.matches ? 1.4 : 1;
 const ico = k => ART[k] ? `<img src="${ART[k]}" alt="${k}">` : '';
 
 // user-written text is untrusted the moment it can come from a stranger
@@ -510,13 +578,13 @@ function decalsForCorner(corner, stage, cx, cy, rng){
   const { fx, fy } = flipFor(corner);
   const out = [];
   for (let i = 0; i < n; i++){
-    const size = spec.size[0] + rng() * (spec.size[1]-spec.size[0]);
+    const size = (spec.size[0] + rng() * (spec.size[1]-spec.size[0])) * uiScale();
     const rot  = (rng()-0.5) * 2 * spec.rot;   // small jitter only — this is
                                                  // directional art, not a free
                                                  // scatter, so it stays close
                                                  // to its mirrored orientation
-    const jx = (rng()-0.5) * 2 * 16;            // fixed-px jitter, independent
-    const jy = (rng()-0.5) * 2 * 16;            // of size (large art shouldn't
+    const jx = (rng()-0.5) * 2 * 16 * uiScale();            // fixed-px jitter, independent
+    const jy = (rng()-0.5) * 2 * 16 * uiScale();            // of size (large art shouldn't
                                                  // wander further than small art)
     // drag the decal's center in from the exact corner point, toward the
     // box's interior — this is what makes it encroach onto the message
@@ -620,16 +688,24 @@ function renderVines(){
   let swayX = 0, lastScrollY = window.scrollY;
   let touchStartX = null, touchStartY = null, touchIsSwiping = false;
 
+  // returns whether the pointer is over the growth at all
   function updateHoleFromLast(){
     const field = document.getElementById('vinefield');
-    if (!field) return;
+    if (!field) return false;
     const rect = field.getBoundingClientRect();
     if (lastClientY < rect.top || lastClientY > rect.bottom ||
         lastClientX < rect.left || lastClientX > rect.right){
-      return;                        // cursor isn't over the growth at all
+      return false;                  // cursor isn't over the growth at all
     }
     holeX = lastClientX - rect.left;
     holeY = lastClientY - rect.top;
+    return true;
+  }
+
+  // start growing back right away (no stillness delay)
+  function regrowNow(){
+    clearTimeout(regrowTimer);
+    holeTargetR = 0;
   }
 
   function scheduleRegrow(){
@@ -650,8 +726,11 @@ function renderVines(){
       }
     }
     lastClientX = e.clientX; lastClientY = e.clientY;
-    updateHoleFromLast();
-    holeTargetR = BRUSH_R;
+    // only keep a clearing open while the pointer is actually over the ivy.
+    // (Before, moving anywhere — e.g. through the blue side margin on the way
+    // out of the window — kept the last clearing frozen open at the column's edge.)
+    if (!updateHoleFromLast()){ regrowNow(); return; }
+    holeTargetR = BRUSH_R * uiScale();
     scheduleRegrow();
   }
 
@@ -695,6 +774,10 @@ function renderVines(){
   window.addEventListener('pointerup', onTouchEnd, {passive:true});
   window.addEventListener('pointercancel', onTouchEnd, {passive:true});
   window.addEventListener('scroll', onScroll, {passive:true});
+  // pointer left the window, or the window/tab lost focus: grow back
+  document.documentElement.addEventListener('mouseleave', regrowNow);
+  window.addEventListener('blur', regrowNow);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) regrowNow(); });
   requestAnimationFrame(tick);
 })();
 
@@ -836,7 +919,7 @@ if (matchMedia('(pointer: coarse)').matches){
 }
 if (!reduceMotion) quillEl.classList.add('awaiting');
 let trail=[], fx=0, fy=-70, t0=0, drift=false, ph=rnd(0,6.28), raf=0;
-let startX=0, targetX=0, targetY=0, fallMs=0, feathered=false;
+let startX=0, targetX=0, targetY=0, fallMs=0, feathered=false, fHalf=32, swayScale=1;
 const size=()=>{cv.width=innerWidth;cv.height=innerHeight}; size();
 
 // the button itself: up as soon as the intro is out of the way
@@ -855,13 +938,16 @@ function landFeather(){
 }
 function launch(){
   // aim for the centre of the button's (empty) icon slot at this screen size
+  fEl.classList.add('live');
+  fHalf = fEl.offsetWidth/2;                 // 32px, or 44.8 at desktop size
+  swayScale = uiScale();
   const icon = quillEl.querySelector('svg').getBoundingClientRect();
-  targetX = icon.left + icon.width/2 - 32;
-  targetY = icon.top  + icon.height/2 - 32;
-  startX = Math.max(16, Math.min(innerWidth-88, innerWidth*0.45 + rnd(-60,60)));
-  fallMs = (targetY + 70) / FALL_SPEED * 1000;
-  fy=-70; ph=rnd(0,6.28); drift=true; trail=[];
-  fEl.classList.add('live'); t0=performance.now();
+  targetX = icon.left + icon.width/2 - fHalf;
+  targetY = icon.top  + icon.height/2 - fHalf;
+  startX = Math.max(16, Math.min(innerWidth-2*fHalf-24, innerWidth*0.45 + rnd(-60,60)*swayScale));
+  fallMs = (targetY + 70*swayScale) / (FALL_SPEED*swayScale) * 1000;   // same ~10s at either size
+  fy=-70*swayScale; ph=rnd(0,6.28); drift=true; trail=[];
+  t0=performance.now();
   cancelAnimationFrame(raf); raf=requestAnimationFrame(step);
 }
 // vertical progress: steady fall, then a soft slow-down over the last 15%
@@ -874,13 +960,13 @@ function step(now){
     const t = (now-t0)/1000;
     const ey = fallCurve(p);
     const settle = p < 0.7 ? 1 : 1 - ((p-0.7)/0.3)**2;     // sway narrows only near the end
-    const sway = Math.sin(t*1.02+ph)*72 + Math.sin(t*2.25+ph)*16;
+    const sway = (Math.sin(t*1.02+ph)*72 + Math.sin(t*2.25+ph)*16) * swayScale;
     fx = startX + (targetX-startX)*ey + sway*settle;
-    fy = -70 + (targetY+70)*ey;
+    fy = -70*swayScale + (targetY+70*swayScale)*ey;
     const rot = Math.sin(t*1.02+ph)*27*settle;
     const sc = p < 0.9 ? 1 : 1 - (p-0.9)/0.1*0.53;          // shrinks down to icon size as it settles
     fEl.style.transform=`translate(${fx.toFixed(1)}px,${fy.toFixed(1)}px) rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)})`;
-    if (p < 0.9) trail.push({x:fx+32,y:fy+34,a:1,s:rnd(2,4)});
+    if (p < 0.9) trail.push({x:fx+fHalf,y:fy+fHalf+2,a:1,s:rnd(2,4)*swayScale});
     if (p >= 1) landFeather();
   }
   trail.forEach(p=>{p.a-=.011;p.y+=.13});
