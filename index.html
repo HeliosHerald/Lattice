@@ -406,7 +406,7 @@ const ART = {
 <div class="col">
   <div class="mast">
     <h1>LATTICE</h1>
-    <p class="hint">swipe to uncover the oldest words.</p>
+    <p class="hint">brush the ivy aside to read the oldest words.</p>
     <div class="ask">A moment you felt like you belonged.</div>
     <p class="sub">Others answered first. Read a few.</p>
   </div>
@@ -629,7 +629,9 @@ function renderVines(){
     const left   = r.left   - fieldRect.left;
     const right  = r.right  - fieldRect.left;
     const stage = stageFor(strength);
+    delete note.dataset.overgrown; delete note.dataset.vineY;
     if (stage === 0) return;
+    note.dataset.overgrown = stage;
 
     const rng = noteRng(4242 + i*97);
     const corners = {
@@ -640,6 +642,7 @@ function renderVines(){
     chosen.forEach(name => {
       const [cx, cy] = corners[name];
       decalsForCorner(name, stage, cx, cy, rng).forEach(d => {
+        if (!note.dataset.vineY) note.dataset.vineY = d.y.toFixed(0);   // field-local
         const img = document.createElement('img');
         img.className = 'vine-decal';
         img.src = ART.ivyCorner;
@@ -722,6 +725,10 @@ function renderVines(){
         touchIsSwiping = true;
       }
     }
+    if (breezeActive){
+      if (Math.abs(e.clientX - lastClientX) < 3 && Math.abs(e.clientY - lastClientY) < 3) return;
+      breezeActive = false;
+    }
     lastClientX = e.clientX; lastClientY = e.clientY;
     // only keep a clearing open while the pointer is actually over the ivy.
     // (Before, moving anywhere — e.g. through the blue side margin on the way
@@ -739,7 +746,7 @@ function renderVines(){
     if (e.pointerType !== 'touch') return;
     touchStartX = touchStartY = null;
     touchIsSwiping = false;
-    scheduleRegrow();
+    if (!breezeActive) scheduleRegrow();   // don't cut a running breeze short
   }
 
   function onScroll(){
@@ -747,7 +754,57 @@ function renderVines(){
     const delta = y - lastScrollY;
     lastScrollY = y;
     swayX = Math.max(-SWAY_MAX, Math.min(SWAY_MAX, swayX + delta * 0.16));
-    updateHoleFromLast();           // content moved under a stationary cursor
+    if (!breezeActive) updateHoleFromLast();   // content moved under a stationary cursor
+    maybeBreeze();
+  }
+
+  /* ---- the breeze: teaching the gesture without instructions ----
+     The first time a well-overgrown message (stage 2+, or any overgrown one
+     if the wall is short) sits comfortably on screen, the ivy parts by itself
+     — the same clearing a cursor or finger makes, sweeping once across the
+     message through its ivy — then grows back as usual. Once per visit. Any
+     real brush takes over immediately. Skipped with reduced motion on. */
+  const BREEZE_MS = 1700;
+  const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let breezeDone = REDUCE_MOTION, breezeActive = false, breezePending = false;
+  function breezeTarget(){
+    return document.querySelector('.note[data-overgrown="3"], .note[data-overgrown="2"]')
+        || document.querySelector('.note[data-overgrown]');
+  }
+  function comfortablyOnScreen(note){
+    const r = note.querySelector('.plate').getBoundingClientRect();
+    return r.top > innerHeight*0.12 && r.bottom < innerHeight*0.82;
+  }
+  function maybeBreeze(){
+    if (breezeDone || breezePending) return;
+    const note = breezeTarget();
+    if (!note || !comfortablyOnScreen(note)) return;
+    // wait a beat so a fast fling past it doesn't trigger it mid-blur
+    breezePending = true;
+    setTimeout(() => {
+      breezePending = false;
+      if (!breezeDone && comfortablyOnScreen(note)) runBreeze(note);
+    }, 450);
+  }
+  function runBreeze(note){
+    const field = document.getElementById('vinefield');
+    if (!field) return;
+    breezeDone = true; breezeActive = true;
+    const fr = field.getBoundingClientRect(), pr = note.querySelector('.plate').getBoundingClientRect();
+    const y = +note.dataset.vineY || (pr.top - fr.top + pr.height/2);
+    const x0 = pr.left - fr.left + pr.width*0.08, x1 = pr.left - fr.left + pr.width*0.92;
+    const t0 = performance.now();
+    holeX = x0; holeY = y; holeTargetR = BRUSH_R * uiScale();
+    clearTimeout(regrowTimer);
+    (function frame(now){
+      if (!breezeActive) return;                 // a real brush took over
+      const p = Math.min(1, (now - t0) / BREEZE_MS);
+      const e = p < .5 ? 2*p*p : 1 - Math.pow(-2*p + 2, 2)/2;
+      holeX = x0 + (x1 - x0)*e;
+      holeY = y - Math.sin(e*Math.PI) * 14 * uiScale();   // a slight arc, like wind
+      if (p < 1) requestAnimationFrame(frame);
+      else { breezeActive = false; regrowNow(); }       // then the ivy creeps back
+    })(t0);
   }
 
   function tick(){
