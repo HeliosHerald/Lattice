@@ -81,8 +81,9 @@
   }
   /* sits in the gap just above the first overgrown message (placed by renderVines);
      absolutely positioned so it never shifts the layout the vines are measured from */
-  .ivy-hint{position:absolute;left:0;bottom:100%;margin:0 0 14px;z-index:6;
-            color:#fff;font-size:12px;opacity:.8;letter-spacing:.02em;pointer-events:none}
+  .ivy-hint{position:absolute;left:0;right:0;bottom:100%;margin:0 0 16px;z-index:6;
+            text-align:center;color:#fff;font:bold 15px/1.4 Helvetica,Arial,sans-serif;
+            letter-spacing:.04em;text-shadow:0 1px 0 rgba(0,0,0,.45);pointer-events:none}
   .sub{margin:16px 0 0;color:#fff;font-size:13px;opacity:.85;max-width:34ch}
 
   /* ---- a note ---- */
@@ -262,6 +263,7 @@
        line at phone width — let "leave one" wrap instead of pushing buttons
        off-screen, and slim the pocket bar icons so the tray fits too */
     .give{flex-wrap:wrap}
+    .ivy-hint{font-size:13.5px;letter-spacing:.02em}   /* stays on one line down to ~360px */
     .give button{min-height:44px}
     .btn{min-height:44px}
     .pocket{gap:8px;padding:5px 8px}
@@ -272,6 +274,7 @@
     #arrive .hand i{padding:10px 14px}
     #arrive .hand i img{height:72px}
   }
+@media (max-width:359px){ .ivy-hint{font-size:12px;letter-spacing:0} }  /* 320px phones */
 /* ==== DESKTOP SCALE (generated) ====
    Every px size above, x1.4, for screens 900px and wider —
    the site's default desktop size. Regenerate this block after
@@ -286,7 +289,7 @@
   .mast h1{font:bold 95.2px/.9 Helvetica,Arial,sans-serif}
   .mast h1 .logo{width:476px}
   .ask{margin:30.8px 0 0;border-width:2.8px;box-shadow:4.2px 4.2px 0 rgba(0,0,0,.35);padding:19.6px 25.2px;font:bold 29.4px/1.28 Helvetica,Arial,sans-serif}
-  .ivy-hint{margin:0 0 19.6px;font-size:16.8px}
+  .ivy-hint{margin:0 0 22.4px;font:bold 21px/1.4 Helvetica,Arial,sans-serif;text-shadow:0 1.4px 0 rgba(0,0,0,.45)}
   .sub{margin:22.4px 0 0;font-size:18.2px}
   .note{margin:81.2px 0 0}
   .frame{border-width:2.8px;box-shadow:5.6px 5.6px 0 rgba(0,0,0,.35);padding:12.6px}
