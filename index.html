@@ -141,13 +141,22 @@
     position:absolute;top:0;left:0;right:0;z-index:5;pointer-events:none;
     overflow:visible;
     --mx:-999px; --my:-999px; --mr:0px;
+  }
+  /* PERFORMANCE (iOS Safari): this layer covers the whole wall. A mask on a
+     layer that big is expensive to repaint, so the mask is only attached while
+     a clearing is actually open (class toggled by the brush loop below). */
+  #vinefield.brushing{
     -webkit-mask-image: radial-gradient(circle var(--mr) at var(--mx) var(--my),
       rgba(255,255,255,0) 0%, rgba(255,255,255,0) 58%, rgba(255,255,255,1) 100%);
     mask-image: radial-gradient(circle var(--mr) at var(--mx) var(--my),
       rgba(255,255,255,0) 0%, rgba(255,255,255,0) 58%, rgba(255,255,255,1) 100%);
   }
-  .vine-decal{position:absolute;display:block;
-              filter:drop-shadow(1px 1px 0 rgba(0,0,0,.5));}
+  .vine-decal{position:absolute;display:block}
+  /* the 1px shadow on each clump: mouse devices only. Dozens of filtered images
+     inside a masked, moving layer is exactly what makes iPhones stutter. */
+  @media (hover:hover) and (pointer:fine){
+    .vine-decal{filter:drop-shadow(1px 1px 0 rgba(0,0,0,.5))}
+  }
 
   /* ---- feather ---- */
   #plume{position:fixed;inset:0;z-index:30;pointer-events:none}
@@ -307,7 +316,6 @@
   .give button:focus-visible{outline:1.4px dotted #000;outline-offset:-7px}
   .tag{font:bold 16.8px Helvetica,Arial,sans-serif}
   #vinefield{--mx:-1398.6px;--my:-1398.6px;--mr:0px}
-  .vine-decal{filter:drop-shadow(1.4px 1.4px 0 rgba(0,0,0,.5))}
   #feather{width:89.6px;height:89.6px}
   #quill{gap:14px;right:22.4px;bottom:98px;border-width:2.8px;box-shadow:5.6px 5.6px 0 rgba(0,0,0,.4);padding:12.6px 19.6px 12.6px 14px;font:bold 19.6px Helvetica,Arial,sans-serif;transform:translateY(8.4px)}
   #quill:active{transform:translate(4.2px,4.2px)}
@@ -782,6 +790,7 @@ function renderVines(){
     if (!updateHoleFromLast()){ regrowNow(); return; }
     holeTargetR = BRUSH_R * uiScale();
     scheduleRegrow();
+    kick();
   }
 
   // belt-and-suspenders: whatever happens mid-touch (the OS deciding it's a
@@ -802,6 +811,7 @@ function renderVines(){
     swayX = Math.max(-SWAY_MAX, Math.min(SWAY_MAX, swayX + delta * 0.16));
     if (!breezeActive) updateHoleFromLast();   // content moved under a stationary cursor
     maybeBreeze();
+    kick();
   }
 
   /* ---- the breeze: teaching the gesture without instructions ----
@@ -842,6 +852,7 @@ function renderVines(){
     const t0 = performance.now();
     holeX = x0; holeY = y; holeTargetR = BRUSH_R * uiScale();
     clearTimeout(regrowTimer);
+    kick();
     (function frame(now){
       if (!breezeActive) return;                 // a real brush took over
       const p = Math.min(1, (now - t0) / BREEZE_MS);
@@ -853,21 +864,31 @@ function renderVines(){
     })(t0);
   }
 
+  // PERFORMANCE: the loop sleeps when nothing is moving (it used to run 60
+  // times a second forever), and only touches the styles that changed.
+  let raf = 0, lastMx = '', lastMy = '', lastMr = '', lastT = '';
+  function kick(){ if (!raf) raf = requestAnimationFrame(tick); }
   function tick(){
+    raf = 0;
     const rate = holeTargetR > holeR ? GROW_RATE : REGROW_RATE;
     holeR += (holeTargetR - holeR) * rate;
     if (holeR < 0.4) holeR = 0;
+    swayX *= SWAY_DECAY;
+    if (Math.abs(swayX) < 0.05) swayX = 0;
     const field = document.getElementById('vinefield');
+    const open = holeR > 0 || holeTargetR > 0;
     if (field){
-      field.style.setProperty('--mx', holeX.toFixed(1) + 'px');
-      field.style.setProperty('--my', holeY.toFixed(1) + 'px');
-      field.style.setProperty('--mr', holeR.toFixed(1) + 'px');
-
-      swayX *= SWAY_DECAY;
-      if (Math.abs(swayX) < 0.05) swayX = 0;
-      field.style.transform = swayX ? `translateX(${swayX.toFixed(2)}px)` : '';
+      field.classList.toggle('brushing', open);
+      if (open){
+        const mx = holeX.toFixed(1) + 'px', my = holeY.toFixed(1) + 'px', mr = holeR.toFixed(1) + 'px';
+        if (mx !== lastMx) field.style.setProperty('--mx', lastMx = mx);
+        if (my !== lastMy) field.style.setProperty('--my', lastMy = my);
+        if (mr !== lastMr) field.style.setProperty('--mr', lastMr = mr);
+      }
+      const t = swayX ? `translateX(${swayX.toFixed(2)}px)` : '';
+      if (t !== lastT) field.style.transform = lastT = t;
     }
-    requestAnimationFrame(tick);
+    if (open || swayX || breezeActive) kick();
   }
 
   window.addEventListener('pointermove', onPointerMove, {passive:true});
@@ -878,7 +899,7 @@ function renderVines(){
   document.documentElement.addEventListener('mouseleave', regrowNow);
   window.addEventListener('blur', regrowNow);
   document.addEventListener('visibilitychange', () => { if (document.hidden) regrowNow(); });
-  requestAnimationFrame(tick);
+  kick();
 })();
 
 /* ---- pocket: persists per device via localStorage, refills on a timer ----
